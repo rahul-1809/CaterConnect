@@ -81,7 +81,7 @@ docker compose up
 cd backend
 pip install -e ".[dev]"
 cp .env.example .env    # fill in your Supabase URL
-uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
 **Customer frontend:**
