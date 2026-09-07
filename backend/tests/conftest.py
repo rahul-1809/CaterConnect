@@ -13,10 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import Base, get_db
 from app.main import app
 
-# Use a dedicated test database
+# Use a dedicated test database (default to in-memory SQLite for isolated fast tests)
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://caterconnect:caterconnect@localhost:5432/caterconnect_test",
+    "sqlite+aiosqlite:///:memory:",
 )
 
 
