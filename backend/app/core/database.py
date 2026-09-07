@@ -1,5 +1,6 @@
 """
 CaterConnect Backend — Async SQLAlchemy Database Setup
+Supports both local PostgreSQL and Supabase PostgreSQL (with SSL).
 """
 from typing import AsyncGenerator
 
@@ -20,12 +21,18 @@ class Base(DeclarativeBase):
 
 def _create_engine():
     settings = get_settings()
+
+    # Supabase requires SSL; local dev does not.
+    # connect_args are passed directly to asyncpg.
+    connect_args = settings.db_connect_args
+
     return create_async_engine(
         settings.database_url,
         pool_size=settings.database_pool_size,
         max_overflow=settings.database_max_overflow,
         echo=settings.debug,
         future=True,
+        connect_args=connect_args,
     )
 
 

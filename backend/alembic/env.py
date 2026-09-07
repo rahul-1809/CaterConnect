@@ -1,5 +1,6 @@
 """
 CaterConnect Backend — Alembic Migrations Environment
+Supports both local PostgreSQL and Supabase (with SSL).
 """
 import asyncio
 from logging.config import fileConfig
@@ -56,11 +57,14 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    """Run migrations using an async engine."""
+    """Run migrations using an async engine (with SSL for Supabase)."""
+    section = config.get_section(config.config_ini_section, {})
+
     connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=settings.db_connect_args,  # SSL for Supabase
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

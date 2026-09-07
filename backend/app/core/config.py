@@ -27,10 +27,16 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
-    # Database
-    database_url: str = "postgresql+asyncpg://caterconnect:caterconnect@localhost:5432/caterconnect"
+    # Database — Supabase PostgreSQL
+    # Format: postgresql+asyncpg://postgres.[project-ref]:[password]@host:port/postgres
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/caterconnect"
     database_pool_size: int = 10
     database_max_overflow: int = 20
+
+    # Supabase project credentials
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+    supabase_service_role_key: str = ""
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
@@ -56,9 +62,6 @@ class Settings(BaseSettings):
 
     # Storage
     storage_bucket: str = "caterconnect-assets"
-    storage_endpoint: str = ""
-    storage_access_key: str = ""
-    storage_secret_key: str = ""
 
     @field_validator("app_env")
     @classmethod
@@ -79,6 +82,21 @@ class Settings(BaseSettings):
     @property
     def is_test(self) -> bool:
         return self.app_env == "test"
+
+    @property
+    def is_supabase(self) -> bool:
+        """Returns True when the DATABASE_URL points to Supabase."""
+        return "supabase.com" in self.database_url
+
+    @property
+    def db_connect_args(self) -> dict:
+        """
+        Returns extra connection arguments for asyncpg.
+        Supabase requires SSL; local dev does not.
+        """
+        if self.is_supabase:
+            return {"ssl": "require"}
+        return {}
 
 
 @lru_cache

@@ -1,27 +1,26 @@
 version: "3.9"
 
-services:
-  # ============================================================================
-  # PostgreSQL — Primary database
-  # ============================================================================
-  postgres:
-    image: postgres:16-alpine
-    container_name: caterconnect_postgres
-    environment:
-      POSTGRES_USER: caterconnect
-      POSTGRES_PASSWORD: caterconnect
-      POSTGRES_DB: caterconnect
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U caterconnect -d caterconnect"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+# =============================================================================
+# CaterConnect — Local Development
+#
+# Database: Supabase (external cloud — configure DATABASE_URL in backend/.env)
+# Cache:    Redis (local container)
+# Backend:  FastAPI
+# Frontend: Next.js (customer + admin)
+#
+# Start everything:
+#   docker compose up
+#
+# Start only backend services (no frontend):
+#   docker compose up redis backend
+#
+# Run without Docker (preferred for fast dev):
+#   cd backend && uvicorn app.main:app --reload
+#   cd frontend/customer && npm run dev
+#   cd frontend/admin && npm run dev -- -p 3001
+# =============================================================================
 
+services:
   # ============================================================================
   # Redis — Cache and rate limiting
   # ============================================================================
@@ -46,26 +45,24 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: caterconnect_backend
+    env_file:
+      - ./backend/.env
     environment:
       APP_ENV: development
-      DATABASE_URL: postgresql+asyncpg://caterconnect:caterconnect@postgres:5432/caterconnect
       REDIS_URL: redis://redis:6379/0
-      DEBUG: "true"
-      OTP_DEV_MODE: "true"
       CORS_ORIGINS: '["http://localhost:3000","http://localhost:3001"]'
+      DEBUG: "true"
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # ============================================================================
-  # Customer Frontend
+  # Customer Frontend (Next.js — port 3000)
   # ============================================================================
   customer:
     build:
@@ -77,15 +74,13 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./frontend/customer:/app
-      - /app/node_modules
-      - /app/.next
+      - ./frontend/customer/src:/app/src
+      - ./frontend/customer/public:/app/public
     depends_on:
       - backend
-    command: npm run dev
 
   # ============================================================================
-  # Admin Frontend
+  # Admin Frontend (Next.js — port 3001)
   # ============================================================================
   admin:
     build:
@@ -97,13 +92,10 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./frontend/admin:/app
-      - /app/node_modules
-      - /app/.next
+      - ./frontend/admin/src:/app/src
+      - ./frontend/admin/public:/app/public
     depends_on:
       - backend
-    command: npm run dev -- -p 3001
 
 volumes:
-  postgres_data:
   redis_data:
