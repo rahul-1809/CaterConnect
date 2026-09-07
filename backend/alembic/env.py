@@ -8,16 +8,12 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
 
 # ---- Import all models so Alembic can detect them ----
 from app.core.config import get_settings
 from app.core.database import Base
-
-# Import models here as they are created (Phase 2+):
-# from app.models.user import User
-# from app.models.customer import CustomerProfile
-# ...
+import app.models  # Registers all models with Base.metadata # noqa: F401
 
 config = context.config
 
@@ -27,14 +23,14 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# Escape '%' to '%%' for ConfigParser interpolation safety
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode — generates SQL without DB connection."""
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
+        url=settings.database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -58,11 +54,8 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_async_migrations() -> None:
     """Run migrations using an async engine (with SSL for Supabase)."""
-    section = config.get_section(config.config_ini_section, {})
-
-    connectable = async_engine_from_config(
-        section,
-        prefix="sqlalchemy.",
+    connectable = create_async_engine(
+        settings.database_url,
         poolclass=pool.NullPool,
         connect_args=settings.db_connect_args,  # SSL for Supabase
     )

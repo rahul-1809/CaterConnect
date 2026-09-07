@@ -145,8 +145,8 @@ pytest tests/ -v
 |---|---|---|
 | 0 | Requirements & Product Foundation | ✅ Complete |
 | 1 | Project Foundation | ✅ Complete |
-| 2 | Authentication | 🔄 Next |
-| 3 | Caterer Catalog Management | ⏳ Pending |
+| 2 | Authentication | ✅ Complete |
+| 3 | Caterer Catalog Management | 🔄 Next |
 | 4 | Customer Browsing Experience | ⏳ Pending |
 | 5 | Event Planner & Menu Builder | ⏳ Pending |
 | 6 | Pricing & Estimate Engine | ⏳ Pending |

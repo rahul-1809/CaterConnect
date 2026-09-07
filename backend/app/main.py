@@ -104,13 +104,10 @@ def create_application() -> FastAPI:
     # ---------------------------------------------------------------------------
     # Routers
     # ---------------------------------------------------------------------------
-    from app.api import health
+    from app.api import auth, health
 
     app.include_router(health.router, prefix="/api/v1", tags=["health"])
-
-    # Future routers will be registered here as each phase is implemented:
-    # from app.api import auth, catalog, events, estimates, quotations, bookings
-    # app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+    app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
     # app.include_router(catalog.router, prefix="/api/v1", tags=["catalog"])
     # ...
 
