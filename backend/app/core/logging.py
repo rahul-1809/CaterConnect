@@ -14,9 +14,18 @@ def configure_logging() -> None:
     settings = get_settings()
     log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
 
+    # Configure standard library logging handler
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=log_level,
+        force=True,
+    )
+
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
+            structlog.stdlib.filter_by_level,
             structlog.stdlib.add_log_level,
             structlog.stdlib.add_logger_name,
             structlog.processors.TimeStamper(fmt="iso"),
@@ -27,19 +36,13 @@ def configure_logging() -> None:
             if settings.is_development
             else structlog.processors.JSONRenderer(),
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(log_level),
+        wrapper_class=structlog.stdlib.BoundLogger,
         context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
-    )
-
-    # Also configure stdlib logging so third-party libraries are captured
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=log_level,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True,
     )
 
 
-def get_logger(name: str) -> structlog.BoundLogger:
+def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     """Return a named structured logger."""
     return structlog.get_logger(name)
