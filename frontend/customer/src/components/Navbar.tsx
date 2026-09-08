@@ -11,8 +11,10 @@ export default function Navbar() {
 
   const navLinks = [
     { href: "/functions", label: "Event Types", icon: Calendar },
-    { href: "/packages", label: "Catering Packages", icon: PackageCheck },
+    { href: "/packages", label: "Packages", icon: PackageCheck },
     { href: "/menu", label: "Menu Catalog", icon: Utensils },
+    { href: "/plan", label: "Plan Event", icon: Sparkles },
+    { href: "/events", label: "My Events", icon: Calendar },
   ];
 
   return (
@@ -43,7 +45,7 @@ export default function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                     isActive
                       ? "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 font-semibold"
                       : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/70 dark:hover:bg-zinc-900/70"
@@ -58,16 +60,12 @@ export default function Navbar() {
 
           {/* Right Action CTA */}
           <div className="hidden lg:flex items-center gap-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 pl-2">
-              <PhoneCall className="w-3.5 h-3.5 text-orange-600" />
-              <span>+91 98765 43210</span>
-            </div>
             <Link
-              href="/packages"
+              href="/plan"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white text-sm font-semibold shadow-md shadow-orange-600/20 hover:shadow-orange-600/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
             >
               <Sparkles className="w-4 h-4" />
-              Explore Menus
+              Plan Your Event
             </Link>
           </div>
 
@@ -108,12 +106,12 @@ export default function Navbar() {
           })}
           <div className="pt-4 mt-2 border-t border-zinc-100 dark:border-zinc-800">
             <Link
-              href="/packages"
+              href="/plan"
               onClick={() => setMobileMenuOpen(false)}
               className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-semibold shadow-md shadow-orange-600/20"
             >
               <Sparkles className="w-4 h-4" />
-              Explore All Packages
+              Plan Your Event
             </Link>
           </div>
         </div>

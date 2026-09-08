@@ -21,6 +21,13 @@ from app.models.catalog import (
     PackageSelectionGroup,
     PackageSelectionGroupItem,
 )
+from app.models.event import (
+    Event,
+    EventItemSourceType,
+    EventMenuItem,
+    EventStatus,
+    EventVersion,
+)
 from app.models.user import (
     Caterer,
     CatererAdmin,
@@ -54,4 +61,9 @@ __all__ = [
     "PackageSelectionGroup",
     "PackageSelectionGroupItem",
     "PackageAddon",
+    "Event",
+    "EventStatus",
+    "EventItemSourceType",
+    "EventMenuItem",
+    "EventVersion",
 ]

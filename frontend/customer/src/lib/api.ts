@@ -426,3 +426,220 @@ export async function getMenuItemById(id: string): Promise<MenuItem | null> {
   const all = await getMenuItems();
   return all.find((i) => i.id === id || i.slug === id) || null;
 }
+
+// ---------------------------------------------------------------------------
+// Customer Event Planner & Saved Plans APIs (Phase 5)
+// ---------------------------------------------------------------------------
+
+export async function createEventDraft(
+  payload: {
+    function_type_id?: string;
+    offering_id?: string;
+    package_id?: string;
+    guest_count?: number;
+    budget_min?: number;
+    budget_max?: number;
+    event_date?: string;
+    event_time?: string;
+    venue_name?: string;
+    venue_address?: string;
+    venue_notes?: string;
+    customer_notes?: string;
+  },
+  token?: string
+): Promise<{ data: any; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/events`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { data: null, error: json.detail?.message || "Failed to create event draft" };
+    }
+    return { data: json.data };
+  } catch (err: any) {
+    return { data: null, error: err.message || "Network error" };
+  }
+}
+
+export async function listCustomerEvents(
+  token?: string,
+  statusFilter?: string
+): Promise<{ items: any[]; total: number }> {
+  try {
+    const q = statusFilter ? `?status=${statusFilter}` : "";
+    const res = await fetch(`${API_BASE}/events${q}`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || { items: [], total: 0 };
+    }
+  } catch {
+    // fallback
+  }
+  return { items: [], total: 0 };
+}
+
+export async function getEventDetails(
+  eventId: string,
+  token?: string
+): Promise<{ data: any; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/events/${eventId}`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { data: null, error: json.detail?.message || "Event not found" };
+    }
+    return { data: json.data };
+  } catch (err: any) {
+    return { data: null, error: err.message || "Network error" };
+  }
+}
+
+export async function updateEventDetails(
+  eventId: string,
+  payload: Record<string, any>,
+  token?: string,
+  ifMatchVersion?: number
+): Promise<{ data: any; error?: string }> {
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (ifMatchVersion !== undefined) headers["If-Match-Version"] = String(ifMatchVersion);
+
+    const res = await fetch(`${API_BASE}/events/${eventId}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { data: null, error: json.detail?.message || "Failed to update event details" };
+    }
+    return { data: json.data };
+  } catch (err: any) {
+    return { data: null, error: err.message || "Network error" };
+  }
+}
+
+export async function updateEventConfiguration(
+  eventId: string,
+  payload: {
+    base_version: number;
+    package_id?: string;
+    menu_items: Array<{
+      menu_item_id: string;
+      source_type: string;
+      selection_group_id?: string | null;
+      quantity?: number;
+      is_included?: boolean;
+    }>;
+  },
+  token?: string
+): Promise<{ data: any; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/events/${eventId}/configuration`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { data: null, error: json.detail?.message || "Failed to update menu configuration" };
+    }
+    return { data: json.data };
+  } catch (err: any) {
+    return { data: null, error: err.message || "Network error" };
+  }
+}
+
+export async function addEventMenuItem(
+  eventId: string,
+  payload: {
+    menu_item_id: string;
+    source_type?: string;
+    selection_group_id?: string | null;
+    quantity?: number;
+    base_version: number;
+  },
+  token?: string
+): Promise<{ data: any; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/events/${eventId}/menu-items`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { data: null, error: json.detail?.message || "Failed to add menu item" };
+    }
+    return { data: json.data };
+  } catch (err: any) {
+    return { data: null, error: err.message || "Network error" };
+  }
+}
+
+export async function removeEventMenuItem(
+  eventId: string,
+  eventMenuItemId: string,
+  baseVersion: number,
+  token?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/events/${eventId}/menu-items/${eventMenuItemId}?base_version=${baseVersion}`, {
+      method: "DELETE",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (!res.ok) {
+      const json = await res.json();
+      return { success: false, error: json.detail?.message || "Failed to remove menu item" };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Network error" };
+  }
+}
+
+export async function getEventVersions(
+  eventId: string,
+  token?: string
+): Promise<{ versions: any[]; current_version: number }> {
+  try {
+    const res = await fetch(`${API_BASE}/events/${eventId}/versions`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || { versions: [], current_version: 1 };
+    }
+  } catch {
+    // fallback
+  }
+  return { versions: [], current_version: 1 };
+}
+
