@@ -2,7 +2,6 @@
 CaterConnect Backend — FastAPI Application Entry Point
 """
 import time
-import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -17,9 +16,13 @@ from app.core.security import generate_request_id
 configure_logging()
 logger = get_logger(__name__)
 
+# Import all models so SQLAlchemy / Alembic can detect them at import time
+import app.models.user  # noqa: F401, E402
+import app.models.catalog  # noqa: F401, E402
+
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(application: FastAPI):
     """Application lifespan — startup and shutdown events."""
     settings = get_settings()
     logger.info(
@@ -35,7 +38,7 @@ async def lifespan(app: FastAPI):
 def create_application() -> FastAPI:
     settings = get_settings()
 
-    app = FastAPI(
+    application = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
         description="Catering Planning & Quotation Platform API",
@@ -47,7 +50,7 @@ def create_application() -> FastAPI:
     # ---------------------------------------------------------------------------
     # CORS
     # ---------------------------------------------------------------------------
-    app.add_middleware(
+    application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
@@ -58,7 +61,7 @@ def create_application() -> FastAPI:
     # ---------------------------------------------------------------------------
     # Request ID middleware
     # ---------------------------------------------------------------------------
-    @app.middleware("http")
+    @application.middleware("http")
     async def request_id_middleware(request: Request, call_next):
         request_id = request.headers.get("X-Request-ID") or generate_request_id()
         request.state.request_id = request_id
@@ -69,7 +72,7 @@ def create_application() -> FastAPI:
     # ---------------------------------------------------------------------------
     # Request timing middleware
     # ---------------------------------------------------------------------------
-    @app.middleware("http")
+    @application.middleware("http")
     async def timing_middleware(request: Request, call_next):
         start = time.perf_counter()
         response: Response = await call_next(request)
@@ -80,7 +83,7 @@ def create_application() -> FastAPI:
     # ---------------------------------------------------------------------------
     # Global exception handler
     # ---------------------------------------------------------------------------
-    @app.exception_handler(Exception)
+    @application.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
         request_id = getattr(request.state, "request_id", "unknown")
         logger.error(
@@ -105,13 +108,17 @@ def create_application() -> FastAPI:
     # Routers
     # ---------------------------------------------------------------------------
     from app.api import auth, health
+    from app.api.admin import catalog as admin_catalog
 
-    app.include_router(health.router, prefix="/api/v1", tags=["health"])
-    app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-    # app.include_router(catalog.router, prefix="/api/v1", tags=["catalog"])
-    # ...
+    application.include_router(health.router, prefix="/api/v1", tags=["health"])
+    application.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+    application.include_router(
+        admin_catalog.router,
+        prefix="/api/v1/admin",
+        tags=["admin-catalog"],
+    )
 
-    return app
+    return application
 
 
 app = create_application()
