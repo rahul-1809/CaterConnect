@@ -4,6 +4,7 @@ Loads all settings from environment variables / .env file.
 """
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,7 +46,7 @@ class Settings(BaseSettings):
     secret_key: str = "insecure-dev-secret-change-in-production"
     session_expire_seconds: int = 86400
     cookie_secure: bool = False
-    cookie_samesite: str = "lax"
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 
     # OTP
     otp_expire_seconds: int = 300

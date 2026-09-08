@@ -5,6 +5,22 @@ Exports all SQLAlchemy ORM models.
 
 from app.core.database import Base
 from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.catalog import (
+    CateringOffering,
+    FunctionOffering,
+    FunctionType,
+    MenuCategory,
+    MenuItem,
+    MenuItemFunction,
+    MenuItemOffering,
+    Package,
+    PackageAddon,
+    PackageFunction,
+    PackageItem,
+    PackageOffering,
+    PackageSelectionGroup,
+    PackageSelectionGroupItem,
+)
 from app.models.user import (
     Caterer,
     CatererAdmin,
@@ -24,4 +40,18 @@ __all__ = [
     "Caterer",
     "CatererAdmin",
     "OTPChallenge",
+    "FunctionType",
+    "CateringOffering",
+    "FunctionOffering",
+    "MenuCategory",
+    "MenuItem",
+    "MenuItemFunction",
+    "MenuItemOffering",
+    "Package",
+    "PackageFunction",
+    "PackageOffering",
+    "PackageItem",
+    "PackageSelectionGroup",
+    "PackageSelectionGroupItem",
+    "PackageAddon",
 ]

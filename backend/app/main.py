@@ -18,8 +18,7 @@ configure_logging()
 logger = get_logger(__name__)
 
 # Import all models so SQLAlchemy / Alembic can detect them at import time
-import app.models.catalog  # noqa: F401, E402
-import app.models.user  # noqa: F401, E402
+from app import models as _models  # noqa: F401, E402
 
 
 @asynccontextmanager
