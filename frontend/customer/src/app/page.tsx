@@ -65,18 +65,18 @@ export default function HomePage() {
             <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-100 dark:bg-orange-950/60 border border-orange-200 dark:border-orange-800/80 text-orange-800 dark:text-orange-300 text-xs font-bold uppercase tracking-wider shadow-sm">
                 <Sparkles className="w-3.5 h-3.5 text-orange-600" />
-                Premier Event & Wedding Catering
+                Authentic Telugu & Hyderabadi Catering Heritage
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-zinc-900 dark:text-white tracking-tight leading-[1.1]">
-                Extraordinary Dining for Life’s Greatest{" "}
+                Grand Vindhu Bhojanam for Life’s Greatest{" "}
                 <span className="bg-gradient-to-r from-orange-600 via-amber-600 to-red-600 bg-clip-text text-transparent">
                   Celebrations.
                 </span>
               </h1>
 
               <p className="text-lg text-zinc-600 dark:text-zinc-300 max-w-2xl font-normal leading-relaxed mx-auto lg:mx-0">
-                From grand wedding banquets to executive corporate galas, explore our curated packages, live culinary counters, and artisanal menus designed to enchant your guests.
+                From traditional Andhra & Telangana <em>Pelli Bhojanam</em> on fresh banana leaves to royal Hyderabadi Dum Biryani banquets — experience time-honored recipes, pure ghee delicacies, and live culinary counters.
               </p>
 
               {/* Interactive Quick Discovery Tool */}
@@ -126,10 +126,10 @@ export default function HomePage() {
                   <ShieldCheck className="w-4 h-4 text-emerald-600" /> 100% FSSAI Certified
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <ChefHat className="w-4 h-4 text-orange-600" /> Master Executive Chefs
+                  <ChefHat className="w-4 h-4 text-orange-600" /> Master Telugu Chefs
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <Flame className="w-4 h-4 text-amber-600" /> Live Cooking Theatres
+                  <Flame className="w-4 h-4 text-amber-600" /> Live Tawa & Dum Theatres
                 </span>
               </div>
             </div>
@@ -144,15 +144,15 @@ export default function HomePage() {
                   </div>
                   <div>
                     <div className="text-xs font-black text-zinc-900 dark:text-white">4.9 / 5.0 Star Rating</div>
-                    <div className="text-[10px] text-zinc-500">From 1,200+ Banquets Hosted</div>
+                    <div className="text-[10px] text-zinc-500">From 1,200+ Telugu Banquets Hosted</div>
                   </div>
                 </div>
 
                 {/* Main Visual Image Card */}
                 <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white dark:border-zinc-800 aspect-[4/5] bg-zinc-900">
                   <Image
-                    src="https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=1200&q=80"
-                    alt="Luxury Catering Spread"
+                    src="https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=1200&q=80"
+                    alt="Authentic Telugu Wedding Bhojanam"
                     fill
                     className="object-cover hover:scale-105 transition-transform duration-700"
                     priority
@@ -163,8 +163,8 @@ export default function HomePage() {
                     <span className="px-3 py-1 rounded-full bg-orange-600 text-[11px] font-bold uppercase tracking-wider inline-block">
                       Signature Showcase
                     </span>
-                    <h3 className="text-xl font-bold">The Royal Mughlai & Coastal Banquet</h3>
-                    <p className="text-xs text-zinc-300">Live charcoal skewers, slow dum handis, and artisanal mithai.</p>
+                    <h3 className="text-xl font-bold">Godavari Grand Pelli Bhojanam</h3>
+                    <p className="text-xs text-zinc-300">Mudda Pappu, Avakaya, Gutti Vankaya, Pootharekulu & live Ghee counters.</p>
                   </div>
                 </div>
               </div>
