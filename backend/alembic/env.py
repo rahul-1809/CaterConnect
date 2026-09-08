@@ -2,18 +2,20 @@
 CaterConnect Backend — Alembic Migrations Environment
 Supports both local PostgreSQL and Supabase (with SSL).
 """
+
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
+import app.models  # Registers all models with Base.metadata # noqa: F401
+from alembic import context
+
 # ---- Import all models so Alembic can detect them ----
 from app.core.config import get_settings
 from app.core.database import Base
-import app.models  # Registers all models with Base.metadata # noqa: F401
 
 config = context.config
 

@@ -391,3 +391,102 @@ async def remove_package_addon(
 ) -> None:
     await repo.get_package_or_404(db, package_id, caterer_id)
     await repo.remove_package_addon(db, package_id, addon_id)
+
+
+# ---------------------------------------------------------------------------
+# Customer Browsing Services (Phase 4)
+# ---------------------------------------------------------------------------
+
+
+async def resolve_public_caterer_id(db: AsyncSession, caterer_id: str | None = None) -> str:
+    return await repo.resolve_public_caterer_id(db, caterer_id)
+
+
+async def list_public_function_types(
+    db: AsyncSession, caterer_id: str, include_inactive: bool = False
+) -> list[FunctionType]:
+    return await repo.list_function_types(db, caterer_id, include_inactive)
+
+
+async def get_public_function_type(
+    db: AsyncSession, function_type_id: str, caterer_id: str
+) -> FunctionType:
+    return await repo.get_function_type_or_404(db, function_type_id, caterer_id)
+
+
+async def list_public_offerings_for_function(
+    db: AsyncSession, function_type_id: str, caterer_id: str
+) -> list[CateringOffering]:
+    return await repo.list_offerings_for_function(
+        db, function_type_id, caterer_id, include_inactive=False
+    )
+
+
+async def list_public_offerings(db: AsyncSession, caterer_id: str) -> list[CateringOffering]:
+    return await repo.list_offerings(db, caterer_id, include_inactive=False)
+
+
+async def get_public_offering(
+    db: AsyncSession, offering_id: str, caterer_id: str
+) -> CateringOffering:
+    return await repo.get_offering_or_404(db, offering_id, caterer_id)
+
+
+async def list_public_packages(
+    db: AsyncSession,
+    caterer_id: str,
+    function_id: str | None = None,
+    offering_id: str | None = None,
+    guest_count: int | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> list[Package]:
+    return await repo.list_packages_filtered(
+        db,
+        caterer_id=caterer_id,
+        function_id=function_id,
+        offering_id=offering_id,
+        guest_count=guest_count,
+        search=search,
+        include_inactive=False,
+        page=page,
+        page_size=page_size,
+    )
+
+
+async def get_public_package(db: AsyncSession, package_id: str, caterer_id: str) -> Package:
+    return await repo.get_package_or_404(db, package_id, caterer_id, load_relations=True)
+
+
+async def list_public_menu_categories(db: AsyncSession, caterer_id: str) -> list[MenuCategory]:
+    return await repo.list_menu_categories(db, caterer_id, include_inactive=False)
+
+
+async def list_public_menu_items(
+    db: AsyncSession,
+    caterer_id: str,
+    category_id: str | None = None,
+    dietary_type: str | None = None,
+    function_id: str | None = None,
+    offering_id: str | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> list[MenuItem]:
+    return await repo.list_menu_items_filtered(
+        db,
+        caterer_id=caterer_id,
+        category_id=category_id,
+        dietary_type=dietary_type,
+        function_id=function_id,
+        offering_id=offering_id,
+        search=search,
+        include_inactive=False,
+        page=page,
+        page_size=page_size,
+    )
+
+
+async def get_public_menu_item(db: AsyncSession, item_id: str, caterer_id: str) -> MenuItem:
+    return await repo.get_menu_item_or_404(db, item_id, caterer_id)

@@ -108,10 +108,12 @@ def create_application() -> FastAPI:
     # Routers
     # ---------------------------------------------------------------------------
     from app.api import auth, health
+    from app.api import catalog as customer_catalog
     from app.api.admin import catalog as admin_catalog
 
     application.include_router(health.router, prefix="/api/v1", tags=["health"])
     application.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+    application.include_router(customer_catalog.router, prefix="/api/v1", tags=["catalog"])
     application.include_router(
         admin_catalog.router,
         prefix="/api/v1/admin",

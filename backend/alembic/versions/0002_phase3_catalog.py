@@ -7,17 +7,19 @@ Revision ID: 0002_phase3_catalog
 Revises: 0001_phase2_auth
 Create Date: 2026-09-08 09:00:00.000000
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "0002_phase3_catalog"
-down_revision: Union[str, None] = "0001_phase2_auth"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0001_phase2_auth"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -37,8 +39,12 @@ def upgrade() -> None:
         sa.Column("image_url", sa.Text(), nullable=True),
         sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("sort_order", sa.Integer(), server_default="0", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.UniqueConstraint("caterer_id", "slug", name="uq_function_types_caterer_slug"),
     )
     op.create_index("ix_function_types_caterer_id", "function_types", ["caterer_id"])
@@ -64,8 +70,12 @@ def upgrade() -> None:
         sa.Column("image_url", sa.Text(), nullable=True),
         sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("sort_order", sa.Integer(), server_default="0", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.UniqueConstraint("caterer_id", "slug", name="uq_catering_offerings_caterer_slug"),
     )
     op.create_index("ix_catering_offerings_caterer_id", "catering_offerings", ["caterer_id"])
@@ -86,10 +96,14 @@ def upgrade() -> None:
             sa.ForeignKey("catering_offerings.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.UniqueConstraint("function_type_id", "offering_id", name="uq_function_offerings"),
     )
-    op.create_index("ix_function_offerings_function_type_id", "function_offerings", ["function_type_id"])
+    op.create_index(
+        "ix_function_offerings_function_type_id", "function_offerings", ["function_type_id"]
+    )
     op.create_index("ix_function_offerings_offering_id", "function_offerings", ["offering_id"])
 
     # 4. menu_categories
@@ -107,8 +121,12 @@ def upgrade() -> None:
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("sort_order", sa.Integer(), server_default="0", nullable=False),
         sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.UniqueConstraint("caterer_id", "slug", name="uq_menu_categories_caterer_slug"),
     )
     op.create_index("ix_menu_categories_caterer_id", "menu_categories", ["caterer_id"])
@@ -137,8 +155,12 @@ def upgrade() -> None:
         sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("sort_order", sa.Integer(), server_default="0", nullable=False),
         sa.Column("extra_metadata", sa.JSON(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.UniqueConstraint("caterer_id", "slug", name="uq_menu_items_caterer_slug"),
     )
     op.create_index("ix_menu_items_caterer_id", "menu_items", ["caterer_id"])
@@ -207,8 +229,12 @@ def upgrade() -> None:
         sa.Column("max_guests", sa.Integer(), nullable=True),
         sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("sort_order", sa.Integer(), server_default="0", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.UniqueConstraint("caterer_id", "slug", name="uq_packages_caterer_slug"),
         sa.CheckConstraint(
             "(min_guests IS NULL OR min_guests > 0) AND "
@@ -274,7 +300,9 @@ def upgrade() -> None:
         ),
         sa.Column("inclusion_type", sa.String(30), server_default="INCLUDED", nullable=False),
         sa.Column("sort_order", sa.Integer(), server_default="0", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.UniqueConstraint("package_id", "menu_item_id", name="uq_package_items"),
     )
     op.create_index("ix_package_items_package_id", "package_items", ["package_id"])
@@ -296,14 +324,20 @@ def upgrade() -> None:
         sa.Column("max_selections", sa.Integer(), server_default="1", nullable=False),
         sa.Column("sort_order", sa.Integer(), server_default="0", nullable=False),
         sa.Column("is_required", sa.Boolean(), server_default=sa.text("false"), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "min_selections >= 0 AND max_selections >= min_selections",
             name="ck_selection_groups_range",
         ),
     )
-    op.create_index("ix_package_selection_groups_package_id", "package_selection_groups", ["package_id"])
+    op.create_index(
+        "ix_package_selection_groups_package_id", "package_selection_groups", ["package_id"]
+    )
 
     # 13. package_selection_group_items
     op.create_table(
@@ -321,7 +355,9 @@ def upgrade() -> None:
             sa.ForeignKey("menu_items.id", ondelete="RESTRICT"),
             nullable=False,
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.UniqueConstraint("selection_group_id", "menu_item_id", name="uq_selection_group_items"),
     )
     op.create_index(
@@ -354,7 +390,9 @@ def upgrade() -> None:
         sa.Column("display_name", sa.String(200), nullable=True),
         sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("sort_order", sa.Integer(), server_default="0", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
     )
     op.create_index("ix_package_addons_package_id", "package_addons", ["package_id"])
     op.create_index("ix_package_addons_menu_item_id", "package_addons", ["menu_item_id"])
