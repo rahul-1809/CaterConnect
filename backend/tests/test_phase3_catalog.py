@@ -3,6 +3,7 @@ CaterConnect Backend — Phase 3 Catalog Management Test Suite
 Covers CRUD operations, slug generation, enable/disable, package-item constraints,
 and authorization enforcement for all catalog entities.
 """
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,10 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import create_session_token
 from app.models.user import Caterer, CatererAdmin, User, UserRole
 
-
 # ---------------------------------------------------------------------------
 # Fixtures: Admin user + caterer setup
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 async def caterer(db_session: AsyncSession) -> Caterer:
@@ -81,6 +82,7 @@ def auth_headers(token: str) -> dict:
 # ===========================================================================
 # FUNCTION TYPES
 # ===========================================================================
+
 
 @pytest.mark.asyncio
 async def test_create_function_type(client: AsyncClient, admin_token: str):
@@ -183,6 +185,7 @@ async def test_unauthenticated_cannot_access_admin(client: AsyncClient):
 # CATERING OFFERINGS
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_create_and_list_offerings(client: AsyncClient, admin_token: str):
     """Admin can create and list catering offerings."""
@@ -260,12 +263,17 @@ async def test_duplicate_link_returns_409(client: AsyncClient, admin_token: str)
 # MENU CATEGORIES
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_create_menu_category(client: AsyncClient, admin_token: str):
     """Admin can create a menu category."""
     r = await client.post(
         "/api/v1/admin/menu/categories",
-        json={"name": "Starters", "description": "Appetizers and starters", "sort_order": 1},
+        json={
+            "name": "Starters",
+            "description": "Appetizers and starters",
+            "sort_order": 1,
+        },
         headers=auth_headers(admin_token),
     )
     assert r.status_code == 201
@@ -300,6 +308,7 @@ async def test_deactivate_menu_category(client: AsyncClient, admin_token: str):
 # ===========================================================================
 # MENU ITEMS
 # ===========================================================================
+
 
 @pytest.mark.asyncio
 async def test_create_menu_item(client: AsyncClient, admin_token: str):
@@ -382,6 +391,7 @@ async def test_list_menu_items_by_category(client: AsyncClient, admin_token: str
 # ===========================================================================
 # PACKAGES
 # ===========================================================================
+
 
 @pytest.fixture
 async def category_and_item(client: AsyncClient, admin_token: str):
@@ -479,9 +489,7 @@ async def test_add_duplicate_item_to_package_returns_409(
 
 
 @pytest.mark.asyncio
-async def test_remove_item_from_package(
-    client: AsyncClient, admin_token: str, category_and_item
-):
+async def test_remove_item_from_package(client: AsyncClient, admin_token: str, category_and_item):
     """Admin can remove an item from a package."""
     _, item_id = category_and_item
     r_pkg = await client.post(
@@ -554,9 +562,7 @@ async def test_selection_group_invalid_range(client: AsyncClient, admin_token: s
 
 
 @pytest.mark.asyncio
-async def test_add_addon_to_package(
-    client: AsyncClient, admin_token: str, category_and_item
-):
+async def test_add_addon_to_package(client: AsyncClient, admin_token: str, category_and_item):
     """Admin can add a paid addon to a package."""
     _, item_id = category_and_item
     r_pkg = await client.post(
@@ -576,9 +582,7 @@ async def test_add_addon_to_package(
 
 
 @pytest.mark.asyncio
-async def test_get_package_detail(
-    client: AsyncClient, admin_token: str, category_and_item
-):
+async def test_get_package_detail(client: AsyncClient, admin_token: str, category_and_item):
     """Package detail endpoint returns nested items, groups, and addons."""
     _, item_id = category_and_item
     r_pkg = await client.post(

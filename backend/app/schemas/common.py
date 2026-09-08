@@ -1,7 +1,8 @@
 """
 CaterConnect Backend — Common API Response Schemas
 """
-from typing import Any, Dict, Generic, Optional, TypeVar
+
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -11,14 +12,14 @@ T = TypeVar("T")
 class APIErrorDetails(BaseModel):
     code: str
     message: str
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
 
 class APIErrorResponse(BaseModel):
     error: APIErrorDetails
-    request_id: Optional[str] = None
+    request_id: str | None = None
 
 
 class StandardResponse(BaseModel, Generic[T]):
     data: T
-    message: Optional[str] = None
+    message: str | None = None

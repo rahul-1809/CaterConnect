@@ -2,7 +2,8 @@
 CaterConnect Backend — Async SQLAlchemy Database Setup
 Supports both local PostgreSQL and Supabase PostgreSQL (with SSL).
 """
-from typing import AsyncGenerator
+
+from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -16,6 +17,7 @@ from app.core.config import get_settings
 
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy ORM models."""
+
     pass
 
 

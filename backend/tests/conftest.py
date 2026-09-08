@@ -2,6 +2,7 @@
 CaterConnect Backend — pytest conftest
 Provides shared fixtures for all tests.
 """
+
 import asyncio
 import os
 
@@ -66,6 +67,7 @@ async def client(db_session):
     Yield an AsyncClient with the get_db dependency overridden
     to use the test session.
     """
+
     async def override_get_db():
         yield db_session
 

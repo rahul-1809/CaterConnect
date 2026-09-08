@@ -2,14 +2,13 @@
 CaterConnect Backend — Base ORM Model
 Provides shared columns (id, created_at, updated_at) for all models.
 """
-import uuid
-from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, func
+import uuid
+from datetime import datetime
+
+from sqlalchemy import DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
-
-from app.core.database import Base
 
 
 class TimestampMixin:

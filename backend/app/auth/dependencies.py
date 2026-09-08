@@ -2,7 +2,8 @@
 CaterConnect Backend — Auth Dependencies
 FastAPI dependencies for extracting session tokens, authenticating users, and enforcing RBAC.
 """
-from typing import Callable, List, Optional
+
+from collections.abc import Callable
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -12,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.logging import get_logger
 from app.core.security import decode_session_token
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.services.auth_service import get_user_by_id
 
 logger = get_logger(__name__)
@@ -21,9 +22,9 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 async def extract_token(
     request: Request,
-    bearer: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    session_token_cookie: Optional[str] = Cookie(None, alias="session_token"),
-) -> Optional[str]:
+    bearer: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    session_token_cookie: str | None = Cookie(None, alias="session_token"),
+) -> str | None:
     """
     Extract session token with priority:
     1. Authorization Bearer header
@@ -37,7 +38,7 @@ async def extract_token(
 
 
 async def get_current_user(
-    token: Optional[str] = Depends(extract_token),
+    token: str | None = Depends(extract_token),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
@@ -84,9 +85,9 @@ async def get_current_user(
 
 
 async def get_optional_current_user(
-    token: Optional[str] = Depends(extract_token),
+    token: str | None = Depends(extract_token),
     db: AsyncSession = Depends(get_db),
-) -> Optional[User]:
+) -> User | None:
     """
     Extract current user if authenticated, otherwise return None.
     Does not raise 401.
@@ -108,6 +109,7 @@ def require_role(*allowed_roles: str) -> Callable:
     Dependency factory that checks if current user has one of the allowed roles.
     Example: Depends(require_role("ADMIN"))
     """
+
     async def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
             raise HTTPException(

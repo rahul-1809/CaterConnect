@@ -1,17 +1,18 @@
 """
 CaterConnect Backend — Authentication & User Schemas
 """
+
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-import phonenumbers
 
 
 class OTPRequestIn(BaseModel):
     """Request payload for initiating OTP challenge."""
 
-    phone_number: str = Field(..., description="Mobile phone number, e.g. 9876543210 or +919876543210")
+    phone_number: str = Field(
+        ..., description="Mobile phone number, e.g. 9876543210 or +919876543210"
+    )
     country_code: str = Field(default="+91", description="Country code prefix, e.g. +91")
 
     @field_validator("phone_number")
@@ -27,7 +28,9 @@ class OTPRequestData(BaseModel):
     challenge_id: str
     expires_in_seconds: int
     retry_after_seconds: int
-    dev_otp: Optional[str] = Field(None, description="Only populated in development mode for easy testing")
+    dev_otp: str | None = Field(
+        None, description="Only populated in development mode for easy testing"
+    )
 
 
 class OTPVerifyIn(BaseModel):
@@ -41,10 +44,10 @@ class CustomerProfileOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    full_name: Optional[str] = None
-    email: Optional[str] = None
-    notes: Optional[str] = None
-    created_at: Optional[datetime] = None
+    full_name: str | None = None
+    email: str | None = None
+    notes: str | None = None
+    created_at: datetime | None = None
 
 
 class UserSummary(BaseModel):
@@ -65,10 +68,10 @@ class CurrentUserOut(BaseModel):
     phone_country_code: str
     role: str
     is_active: bool
-    last_login_at: Optional[datetime] = None
-    customer_profile: Optional[CustomerProfileOut] = None
+    last_login_at: datetime | None = None
+    customer_profile: CustomerProfileOut | None = None
 
 
 class OTPVerifyData(BaseModel):
     user: CurrentUserOut
-    session_token: Optional[str] = None  # Returned in payload for non-cookie / mobile clients
+    session_token: str | None = None  # Returned in payload for non-cookie / mobile clients

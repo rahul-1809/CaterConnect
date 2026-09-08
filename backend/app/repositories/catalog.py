@@ -2,8 +2,8 @@
 CaterConnect Backend — Catalog Repository
 Async CRUD operations for all catalog entities using SQLAlchemy.
 """
+
 import re
-from typing import List, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -17,13 +17,9 @@ from app.models.catalog import (
     FunctionType,
     MenuCategory,
     MenuItem,
-    MenuItemFunction,
-    MenuItemOffering,
     Package,
     PackageAddon,
-    PackageFunction,
     PackageItem,
-    PackageOffering,
     PackageSelectionGroup,
     PackageSelectionGroupItem,
 )
@@ -34,6 +30,7 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Slug helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_slug(name: str) -> str:
     """Generate a URL-safe slug from a name string."""
@@ -49,7 +46,7 @@ async def _ensure_unique_slug(
     model,
     caterer_id: str,
     base_slug: str,
-    exclude_id: Optional[str] = None,
+    exclude_id: str | None = None,
 ) -> str:
     """Return a slug that is unique within (caterer_id, slug). Appends -N if needed."""
     slug = base_slug
@@ -73,11 +70,12 @@ async def _ensure_unique_slug(
 # Function Types
 # ---------------------------------------------------------------------------
 
+
 async def list_function_types(
     db: AsyncSession,
     caterer_id: str,
     include_inactive: bool = False,
-) -> List[FunctionType]:
+) -> list[FunctionType]:
     stmt = select(FunctionType).where(FunctionType.caterer_id == caterer_id)
     if not include_inactive:
         stmt = stmt.where(FunctionType.is_active == True)  # noqa: E712
@@ -98,7 +96,10 @@ async def get_function_type_or_404(
     if not obj:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "FUNCTION_TYPE_NOT_FOUND", "message": "Function type not found."},
+            detail={
+                "code": "FUNCTION_TYPE_NOT_FOUND",
+                "message": "Function type not found.",
+            },
         )
     return obj
 
@@ -107,8 +108,8 @@ async def create_function_type(
     db: AsyncSession,
     caterer_id: str,
     name: str,
-    description: Optional[str],
-    image_url: Optional[str],
+    description: str | None,
+    image_url: str | None,
     is_active: bool,
     sort_order: int,
 ) -> FunctionType:
@@ -138,7 +139,11 @@ async def update_function_type(
         if value is not None or field in ("description", "image_url"):
             if field == "name" and value:
                 new_slug = await _ensure_unique_slug(
-                    db, FunctionType, obj.caterer_id, _make_slug(value), exclude_id=obj.id
+                    db,
+                    FunctionType,
+                    obj.caterer_id,
+                    _make_slug(value),
+                    exclude_id=obj.id,
                 )
                 obj.slug = new_slug
             if value is not None:
@@ -152,11 +157,12 @@ async def update_function_type(
 # Catering Offerings
 # ---------------------------------------------------------------------------
 
+
 async def list_offerings(
     db: AsyncSession,
     caterer_id: str,
     include_inactive: bool = False,
-) -> List[CateringOffering]:
+) -> list[CateringOffering]:
     stmt = select(CateringOffering).where(CateringOffering.caterer_id == caterer_id)
     if not include_inactive:
         stmt = stmt.where(CateringOffering.is_active == True)  # noqa: E712
@@ -177,7 +183,10 @@ async def get_offering_or_404(
     if not obj:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "OFFERING_NOT_FOUND", "message": "Catering offering not found."},
+            detail={
+                "code": "OFFERING_NOT_FOUND",
+                "message": "Catering offering not found.",
+            },
         )
     return obj
 
@@ -186,8 +195,8 @@ async def create_offering(
     db: AsyncSession,
     caterer_id: str,
     name: str,
-    description: Optional[str],
-    image_url: Optional[str],
+    description: str | None,
+    image_url: str | None,
     is_active: bool,
     sort_order: int,
 ) -> CateringOffering:
@@ -216,7 +225,11 @@ async def update_offering(
     for field, value in kwargs.items():
         if field == "name" and value:
             new_slug = await _ensure_unique_slug(
-                db, CateringOffering, obj.caterer_id, _make_slug(value), exclude_id=obj.id
+                db,
+                CateringOffering,
+                obj.caterer_id,
+                _make_slug(value),
+                exclude_id=obj.id,
             )
             obj.slug = new_slug
         if value is not None:
@@ -229,6 +242,7 @@ async def update_offering(
 # ---------------------------------------------------------------------------
 # Function ↔ Offering Links
 # ---------------------------------------------------------------------------
+
 
 async def add_function_offering_link(
     db: AsyncSession,
@@ -247,7 +261,10 @@ async def add_function_offering_link(
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "LINK_EXISTS", "message": "This function-offering link already exists."},
+            detail={
+                "code": "LINK_EXISTS",
+                "message": "This function-offering link already exists.",
+            },
         )
 
     link = FunctionOffering(
@@ -274,7 +291,10 @@ async def remove_function_offering_link(
     if not link:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "LINK_NOT_FOUND", "message": "Function-offering link not found."},
+            detail={
+                "code": "LINK_NOT_FOUND",
+                "message": "Function-offering link not found.",
+            },
         )
     await db.delete(link)
     await db.commit()
@@ -284,11 +304,12 @@ async def remove_function_offering_link(
 # Menu Categories
 # ---------------------------------------------------------------------------
 
+
 async def list_menu_categories(
     db: AsyncSession,
     caterer_id: str,
     include_inactive: bool = False,
-) -> List[MenuCategory]:
+) -> list[MenuCategory]:
     stmt = select(MenuCategory).where(MenuCategory.caterer_id == caterer_id)
     if not include_inactive:
         stmt = stmt.where(MenuCategory.is_active == True)  # noqa: E712
@@ -309,7 +330,10 @@ async def get_menu_category_or_404(
     if not obj:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "MENU_CATEGORY_NOT_FOUND", "message": "Menu category not found."},
+            detail={
+                "code": "MENU_CATEGORY_NOT_FOUND",
+                "message": "Menu category not found.",
+            },
         )
     return obj
 
@@ -318,7 +342,7 @@ async def create_menu_category(
     db: AsyncSession,
     caterer_id: str,
     name: str,
-    description: Optional[str],
+    description: str | None,
     sort_order: int,
     is_active: bool,
 ) -> MenuCategory:
@@ -360,12 +384,13 @@ async def update_menu_category(
 # Menu Items
 # ---------------------------------------------------------------------------
 
+
 async def list_menu_items(
     db: AsyncSession,
     caterer_id: str,
-    category_id: Optional[str] = None,
+    category_id: str | None = None,
     include_inactive: bool = False,
-) -> List[MenuItem]:
+) -> list[MenuItem]:
     stmt = select(MenuItem).where(MenuItem.caterer_id == caterer_id)
     if category_id:
         stmt = stmt.where(MenuItem.category_id == category_id)
@@ -376,9 +401,7 @@ async def list_menu_items(
     return list(result.scalars().all())
 
 
-async def get_menu_item_or_404(
-    db: AsyncSession, item_id: str, caterer_id: str
-) -> MenuItem:
+async def get_menu_item_or_404(db: AsyncSession, item_id: str, caterer_id: str) -> MenuItem:
     stmt = select(MenuItem).where(
         MenuItem.id == item_id,
         MenuItem.caterer_id == caterer_id,
@@ -398,12 +421,12 @@ async def create_menu_item(
     caterer_id: str,
     category_id: str,
     name: str,
-    description: Optional[str],
-    dietary_type: Optional[str],
-    image_url: Optional[str],
+    description: str | None,
+    dietary_type: str | None,
+    image_url: str | None,
     is_active: bool,
     sort_order: int,
-    extra_metadata: Optional[dict],
+    extra_metadata: dict | None,
 ) -> MenuItem:
     # Verify category belongs to caterer
     await get_menu_category_or_404(db, category_id, caterer_id)
@@ -453,11 +476,12 @@ async def update_menu_item(
 # Packages
 # ---------------------------------------------------------------------------
 
+
 async def list_packages(
     db: AsyncSession,
     caterer_id: str,
     include_inactive: bool = False,
-) -> List[Package]:
+) -> list[Package]:
     stmt = (
         select(Package)
         .where(Package.caterer_id == caterer_id)
@@ -504,10 +528,10 @@ async def create_package(
     db: AsyncSession,
     caterer_id: str,
     name: str,
-    description: Optional[str],
-    image_url: Optional[str],
-    min_guests: Optional[int],
-    max_guests: Optional[int],
+    description: str | None,
+    image_url: str | None,
+    min_guests: int | None,
+    max_guests: int | None,
     is_active: bool,
     sort_order: int,
 ) -> Package:
@@ -552,6 +576,7 @@ async def update_package(
 # Package Items
 # ---------------------------------------------------------------------------
 
+
 async def add_package_item(
     db: AsyncSession,
     package: Package,
@@ -571,7 +596,10 @@ async def add_package_item(
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "PACKAGE_ITEM_EXISTS", "message": "This item is already in the package."},
+            detail={
+                "code": "PACKAGE_ITEM_EXISTS",
+                "message": "This item is already in the package.",
+            },
         )
 
     item = PackageItem(
@@ -586,9 +614,7 @@ async def add_package_item(
     return item
 
 
-async def remove_package_item(
-    db: AsyncSession, package_id: str, item_id: str
-) -> None:
+async def remove_package_item(db: AsyncSession, package_id: str, item_id: str) -> None:
     stmt = select(PackageItem).where(
         PackageItem.id == item_id,
         PackageItem.package_id == package_id,
@@ -598,7 +624,10 @@ async def remove_package_item(
     if not item:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "PACKAGE_ITEM_NOT_FOUND", "message": "Package item not found."},
+            detail={
+                "code": "PACKAGE_ITEM_NOT_FOUND",
+                "message": "Package item not found.",
+            },
         )
     await db.delete(item)
     await db.commit()
@@ -608,11 +637,12 @@ async def remove_package_item(
 # Package Selection Groups
 # ---------------------------------------------------------------------------
 
+
 async def create_selection_group(
     db: AsyncSession,
     package: Package,
     name: str,
-    description: Optional[str],
+    description: str | None,
     min_selections: int,
     max_selections: int,
     sort_order: int,
@@ -656,7 +686,10 @@ async def get_selection_group_or_404(
     if not obj:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "SELECTION_GROUP_NOT_FOUND", "message": "Selection group not found."},
+            detail={
+                "code": "SELECTION_GROUP_NOT_FOUND",
+                "message": "Selection group not found.",
+            },
         )
     return obj
 
@@ -690,7 +723,10 @@ async def add_selection_group_item(
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "SELECTION_GROUP_ITEM_EXISTS", "message": "Item already in selection group."},
+            detail={
+                "code": "SELECTION_GROUP_ITEM_EXISTS",
+                "message": "Item already in selection group.",
+            },
         )
 
     sg_item = PackageSelectionGroupItem(
@@ -703,9 +739,7 @@ async def add_selection_group_item(
     return sg_item
 
 
-async def remove_selection_group_item(
-    db: AsyncSession, group_id: str, item_id: str
-) -> None:
+async def remove_selection_group_item(db: AsyncSession, group_id: str, item_id: str) -> None:
     stmt = select(PackageSelectionGroupItem).where(
         PackageSelectionGroupItem.id == item_id,
         PackageSelectionGroupItem.selection_group_id == group_id,
@@ -715,7 +749,10 @@ async def remove_selection_group_item(
     if not item:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "SELECTION_GROUP_ITEM_NOT_FOUND", "message": "Selection group item not found."},
+            detail={
+                "code": "SELECTION_GROUP_ITEM_NOT_FOUND",
+                "message": "Selection group item not found.",
+            },
         )
     await db.delete(item)
     await db.commit()
@@ -725,11 +762,12 @@ async def remove_selection_group_item(
 # Package Addons
 # ---------------------------------------------------------------------------
 
+
 async def add_package_addon(
     db: AsyncSession,
     package: Package,
     menu_item_id: str,
-    display_name: Optional[str],
+    display_name: str | None,
     is_active: bool,
     sort_order: int,
 ) -> PackageAddon:
@@ -748,9 +786,7 @@ async def add_package_addon(
     return addon
 
 
-async def remove_package_addon(
-    db: AsyncSession, package_id: str, addon_id: str
-) -> None:
+async def remove_package_addon(db: AsyncSession, package_id: str, addon_id: str) -> None:
     stmt = select(PackageAddon).where(
         PackageAddon.id == addon_id,
         PackageAddon.package_id == package_id,

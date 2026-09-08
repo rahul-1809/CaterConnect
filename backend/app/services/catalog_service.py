@@ -2,7 +2,6 @@
 CaterConnect Backend — Catalog Service Layer
 Business logic: resolves caterer context, delegates to repository, handles auth.
 """
-from typing import List, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -31,6 +30,7 @@ logger = get_logger(__name__)
 # Caterer resolution helpers
 # ---------------------------------------------------------------------------
 
+
 async def resolve_caterer_id(db: AsyncSession, user: User) -> str:
     """
     For ADMIN/STAFF users, return the caterer_id they are associated with.
@@ -54,11 +54,12 @@ async def resolve_caterer_id(db: AsyncSession, user: User) -> str:
 # Function Types
 # ---------------------------------------------------------------------------
 
+
 async def list_function_types(
     db: AsyncSession,
     caterer_id: str,
     include_inactive: bool = False,
-) -> List[FunctionType]:
+) -> list[FunctionType]:
     return await repo.list_function_types(db, caterer_id, include_inactive)
 
 
@@ -66,8 +67,8 @@ async def create_function_type(
     db: AsyncSession,
     caterer_id: str,
     name: str,
-    description: Optional[str] = None,
-    image_url: Optional[str] = None,
+    description: str | None = None,
+    image_url: str | None = None,
     is_active: bool = True,
     sort_order: int = 0,
 ) -> FunctionType:
@@ -90,11 +91,12 @@ async def update_function_type(
 # Catering Offerings
 # ---------------------------------------------------------------------------
 
+
 async def list_offerings(
     db: AsyncSession,
     caterer_id: str,
     include_inactive: bool = False,
-) -> List[CateringOffering]:
+) -> list[CateringOffering]:
     return await repo.list_offerings(db, caterer_id, include_inactive)
 
 
@@ -102,8 +104,8 @@ async def create_offering(
     db: AsyncSession,
     caterer_id: str,
     name: str,
-    description: Optional[str] = None,
-    image_url: Optional[str] = None,
+    description: str | None = None,
+    image_url: str | None = None,
     is_active: bool = True,
     sort_order: int = 0,
 ) -> CateringOffering:
@@ -146,11 +148,12 @@ async def unlink_function_offering(
 # Menu Categories
 # ---------------------------------------------------------------------------
 
+
 async def list_menu_categories(
     db: AsyncSession,
     caterer_id: str,
     include_inactive: bool = False,
-) -> List[MenuCategory]:
+) -> list[MenuCategory]:
     return await repo.list_menu_categories(db, caterer_id, include_inactive)
 
 
@@ -158,13 +161,11 @@ async def create_menu_category(
     db: AsyncSession,
     caterer_id: str,
     name: str,
-    description: Optional[str] = None,
+    description: str | None = None,
     sort_order: int = 0,
     is_active: bool = True,
 ) -> MenuCategory:
-    return await repo.create_menu_category(
-        db, caterer_id, name, description, sort_order, is_active
-    )
+    return await repo.create_menu_category(db, caterer_id, name, description, sort_order, is_active)
 
 
 async def update_menu_category(
@@ -181,12 +182,13 @@ async def update_menu_category(
 # Menu Items
 # ---------------------------------------------------------------------------
 
+
 async def list_menu_items(
     db: AsyncSession,
     caterer_id: str,
-    category_id: Optional[str] = None,
+    category_id: str | None = None,
     include_inactive: bool = False,
-) -> List[MenuItem]:
+) -> list[MenuItem]:
     return await repo.list_menu_items(db, caterer_id, category_id, include_inactive)
 
 
@@ -195,16 +197,24 @@ async def create_menu_item(
     caterer_id: str,
     category_id: str,
     name: str,
-    description: Optional[str] = None,
-    dietary_type: Optional[str] = None,
-    image_url: Optional[str] = None,
+    description: str | None = None,
+    dietary_type: str | None = None,
+    image_url: str | None = None,
     is_active: bool = True,
     sort_order: int = 0,
-    extra_metadata: Optional[dict] = None,
+    extra_metadata: dict | None = None,
 ) -> MenuItem:
     return await repo.create_menu_item(
-        db, caterer_id, category_id, name, description,
-        dietary_type, image_url, is_active, sort_order, extra_metadata,
+        db,
+        caterer_id,
+        category_id,
+        name,
+        description,
+        dietary_type,
+        image_url,
+        is_active,
+        sort_order,
+        extra_metadata,
     )
 
 
@@ -222,11 +232,12 @@ async def update_menu_item(
 # Packages
 # ---------------------------------------------------------------------------
 
+
 async def list_packages(
     db: AsyncSession,
     caterer_id: str,
     include_inactive: bool = False,
-) -> List[Package]:
+) -> list[Package]:
     return await repo.list_packages(db, caterer_id, include_inactive)
 
 
@@ -234,16 +245,23 @@ async def create_package(
     db: AsyncSession,
     caterer_id: str,
     name: str,
-    description: Optional[str] = None,
-    image_url: Optional[str] = None,
-    min_guests: Optional[int] = None,
-    max_guests: Optional[int] = None,
+    description: str | None = None,
+    image_url: str | None = None,
+    min_guests: int | None = None,
+    max_guests: int | None = None,
     is_active: bool = True,
     sort_order: int = 0,
 ) -> Package:
     return await repo.create_package(
-        db, caterer_id, name, description, image_url,
-        min_guests, max_guests, is_active, sort_order,
+        db,
+        caterer_id,
+        name,
+        description,
+        image_url,
+        min_guests,
+        max_guests,
+        is_active,
+        sort_order,
     )
 
 
@@ -257,15 +275,14 @@ async def update_package(
     return await repo.update_package(db, obj, **kwargs)
 
 
-async def get_package_detail(
-    db: AsyncSession, caterer_id: str, package_id: str
-) -> Package:
+async def get_package_detail(db: AsyncSession, caterer_id: str, package_id: str) -> Package:
     return await repo.get_package_or_404(db, package_id, caterer_id, load_relations=True)
 
 
 # ---------------------------------------------------------------------------
 # Package Items
 # ---------------------------------------------------------------------------
+
 
 async def add_package_item(
     db: AsyncSession,
@@ -290,12 +307,13 @@ async def remove_package_item(
 # Package Selection Groups
 # ---------------------------------------------------------------------------
 
+
 async def create_selection_group(
     db: AsyncSession,
     caterer_id: str,
     package_id: str,
     name: str,
-    description: Optional[str],
+    description: str | None,
     min_selections: int,
     max_selections: int,
     sort_order: int,
@@ -303,7 +321,14 @@ async def create_selection_group(
 ) -> PackageSelectionGroup:
     pkg = await repo.get_package_or_404(db, package_id, caterer_id)
     return await repo.create_selection_group(
-        db, pkg, name, description, min_selections, max_selections, sort_order, is_required
+        db,
+        pkg,
+        name,
+        description,
+        min_selections,
+        max_selections,
+        sort_order,
+        is_required,
     )
 
 
@@ -347,12 +372,13 @@ async def remove_selection_group_item(
 # Package Addons
 # ---------------------------------------------------------------------------
 
+
 async def add_package_addon(
     db: AsyncSession,
     caterer_id: str,
     package_id: str,
     menu_item_id: str,
-    display_name: Optional[str],
+    display_name: str | None,
     is_active: bool,
     sort_order: int,
 ) -> PackageAddon:

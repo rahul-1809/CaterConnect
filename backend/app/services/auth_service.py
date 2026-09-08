@@ -2,8 +2,8 @@
 CaterConnect Backend — Authentication Service
 Handles phone normalization, OTP generation/verification, user creation, and session management.
 """
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple
+
+from datetime import UTC, datetime, timedelta
 
 import phonenumbers
 from fastapi import HTTPException, status
@@ -13,13 +13,18 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.core.security import create_session_token, generate_otp, hash_otp, verify_otp_hash
+from app.core.security import (
+    create_session_token,
+    generate_otp,
+    hash_otp,
+    verify_otp_hash,
+)
 from app.models.user import CustomerProfile, OTPChallenge, User, UserRole
 
 logger = get_logger(__name__)
 
 
-def normalize_phone_number(phone_raw: str, default_region: str = "IN") -> Tuple[str, str]:
+def normalize_phone_number(phone_raw: str, default_region: str = "IN") -> tuple[str, str]:
     """
     Parse and normalize a phone number into (E.164 full number, country code).
     Examples:
@@ -56,7 +61,7 @@ async def check_otp_rate_limit(db: AsyncSession, phone_number: str) -> None:
     2. Hourly limit (e.g. max 5 OTPs per hour).
     """
     settings = get_settings()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     window_start = now - timedelta(seconds=settings.otp_rate_limit_window_seconds)
     cooldown_cutoff = now - timedelta(seconds=30)
 
@@ -75,7 +80,7 @@ async def check_otp_rate_limit(db: AsyncSession, phone_number: str) -> None:
     if recent_challenge:
         created_at = recent_challenge.created_at
         if created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
+            created_at = created_at.replace(tzinfo=UTC)
         seconds_passed = int((now - created_at).total_seconds())
         retry_after = max(1, 30 - seconds_passed)
         if retry_after > 0:
@@ -100,7 +105,10 @@ async def check_otp_rate_limit(db: AsyncSession, phone_number: str) -> None:
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={
                 "code": "AUTH_OTP_HOURLY_LIMIT_EXCEEDED",
-                "message": f"Too many OTP requests. Maximum {settings.otp_rate_limit_requests} attempts per hour.",
+                "message": (
+                    f"Too many OTP requests. Maximum "
+                    f"{settings.otp_rate_limit_requests} attempts per hour."
+                ),
                 "retry_after_seconds": settings.otp_rate_limit_window_seconds,
             },
         )
@@ -110,7 +118,7 @@ async def create_otp_challenge(
     db: AsyncSession,
     phone_number_raw: str,
     country_code_hint: str = "+91",
-) -> Tuple[OTPChallenge, str]:
+) -> tuple[OTPChallenge, str]:
     """
     Normalize phone number, verify rate limits, generate OTP code and persist hashed challenge.
     Returns (OTPChallenge, raw_otp_code).
@@ -122,7 +130,7 @@ async def create_otp_challenge(
 
     raw_otp = generate_otp(6)
     code_hash = hash_otp(raw_otp)
-    expires_at = datetime.now(tz=timezone.utc) + timedelta(seconds=settings.otp_expire_seconds)
+    expires_at = datetime.now(tz=UTC) + timedelta(seconds=settings.otp_expire_seconds)
 
     challenge = OTPChallenge(
         phone_number=e164_phone,
@@ -151,9 +159,10 @@ async def verify_otp_code(
     db: AsyncSession,
     challenge_id: str,
     otp_code: str,
-) -> Tuple[User, str]:
+) -> tuple[User, str]:
     """
-    Validate challenge and OTP. On success, create or fetch user, establish session, and return (user, token).
+    Validate challenge and OTP.
+    On success, create or fetch user, establish session, and return (user, token).
     """
     stmt = select(OTPChallenge).where(OTPChallenge.id == challenge_id)
     res = await db.execute(stmt)
@@ -209,7 +218,7 @@ async def verify_otp_code(
         )
 
     # Valid OTP -> Consume challenge
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     challenge.consumed_at = now
 
     # Find or create User
@@ -244,11 +253,7 @@ async def verify_otp_code(
     await db.refresh(user)
 
     # Re-fetch with customer_profile loaded
-    user_stmt = (
-        select(User)
-        .options(selectinload(User.customer_profile))
-        .where(User.id == user.id)
-    )
+    user_stmt = select(User).options(selectinload(User.customer_profile)).where(User.id == user.id)
     user_res = await db.execute(user_stmt)
     user = user_res.scalar_one()
 
@@ -257,7 +262,7 @@ async def verify_otp_code(
     return user, session_token
 
 
-async def get_user_by_id(db: AsyncSession, user_id: str) -> Optional[User]:
+async def get_user_by_id(db: AsyncSession, user_id: str) -> User | None:
     """Retrieve user with profile by UUID."""
     stmt = (
         select(User)

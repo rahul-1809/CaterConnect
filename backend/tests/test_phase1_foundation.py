@@ -2,6 +2,7 @@
 Phase 1 Tests — Project Foundation
 Exit criteria: backend starts, DB connectivity works, health API responds.
 """
+
 import pytest
 
 
@@ -51,6 +52,7 @@ async def test_404_unknown_route(client):
 def test_settings_load():
     """Settings load without raising exceptions."""
     from app.core.config import get_settings
+
     settings = get_settings()
     assert settings.app_name == "CaterConnect"
     assert settings.app_version == "0.1.0"
@@ -59,6 +61,7 @@ def test_settings_load():
 def test_security_otp_generation():
     """OTP generation produces 6-digit numeric codes."""
     from app.core.security import generate_otp
+
     otp = generate_otp()
     assert len(otp) == 6
     assert otp.isdigit()
@@ -67,6 +70,7 @@ def test_security_otp_generation():
 def test_security_otp_hash_verify():
     """OTP hash verification works correctly."""
     from app.core.security import generate_otp, hash_otp, verify_otp_hash
+
     otp = generate_otp()
     hashed = hash_otp(otp)
     assert verify_otp_hash(otp, hashed)
@@ -76,6 +80,7 @@ def test_security_otp_hash_verify():
 def test_security_session_token():
     """Session token can be created and decoded."""
     from app.core.security import create_session_token, decode_session_token
+
     token = create_session_token("user-123", "CUSTOMER")
     payload = decode_session_token(token)
     assert payload["sub"] == "user-123"
@@ -85,6 +90,7 @@ def test_security_session_token():
 def test_human_readable_id_format():
     """Human-readable IDs are correctly formatted."""
     from app.core.security import generate_human_readable_id
+
     id_ = generate_human_readable_id("CR", 2026, 125)
     assert id_ == "CR-2026-00125"
     id2 = generate_human_readable_id("QT", 2026, 1)

@@ -2,15 +2,15 @@
 CaterConnect Backend — Catalog Pydantic Schemas
 Request/response models for all catalog resources (Phase 3).
 """
+
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
 
 class CatalogBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -20,22 +20,25 @@ class CatalogBase(BaseModel):
 # Function Types
 # ---------------------------------------------------------------------------
 
+
 class FunctionTypeIn(BaseModel):
     """Payload to create a new function type."""
+
     name: str = Field(..., min_length=1, max_length=120)
-    description: Optional[str] = None
-    image_url: Optional[str] = None
+    description: str | None = None
+    image_url: str | None = None
     is_active: bool = True
     sort_order: int = 0
 
 
 class FunctionTypeUpdate(BaseModel):
     """Partial update payload for function types."""
-    name: Optional[str] = Field(None, min_length=1, max_length=120)
-    description: Optional[str] = None
-    image_url: Optional[str] = None
-    is_active: Optional[bool] = None
-    sort_order: Optional[int] = None
+
+    name: str | None = Field(None, min_length=1, max_length=120)
+    description: str | None = None
+    image_url: str | None = None
+    is_active: bool | None = None
+    sort_order: int | None = None
 
 
 class FunctionTypeOut(CatalogBase):
@@ -43,8 +46,8 @@ class FunctionTypeOut(CatalogBase):
     caterer_id: str
     name: str
     slug: str
-    description: Optional[str] = None
-    image_url: Optional[str] = None
+    description: str | None = None
+    image_url: str | None = None
     is_active: bool
     sort_order: int
     created_at: datetime
@@ -55,20 +58,21 @@ class FunctionTypeOut(CatalogBase):
 # Catering Offerings
 # ---------------------------------------------------------------------------
 
+
 class CateringOfferingIn(BaseModel):
     name: str = Field(..., min_length=1, max_length=150)
-    description: Optional[str] = None
-    image_url: Optional[str] = None
+    description: str | None = None
+    image_url: str | None = None
     is_active: bool = True
     sort_order: int = 0
 
 
 class CateringOfferingUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=150)
-    description: Optional[str] = None
-    image_url: Optional[str] = None
-    is_active: Optional[bool] = None
-    sort_order: Optional[int] = None
+    name: str | None = Field(None, min_length=1, max_length=150)
+    description: str | None = None
+    image_url: str | None = None
+    is_active: bool | None = None
+    sort_order: int | None = None
 
 
 class CateringOfferingOut(CatalogBase):
@@ -76,8 +80,8 @@ class CateringOfferingOut(CatalogBase):
     caterer_id: str
     name: str
     slug: str
-    description: Optional[str] = None
-    image_url: Optional[str] = None
+    description: str | None = None
+    image_url: str | None = None
     is_active: bool
     sort_order: int
     created_at: datetime
@@ -87,6 +91,7 @@ class CateringOfferingOut(CatalogBase):
 # ---------------------------------------------------------------------------
 # Function ↔ Offering Link
 # ---------------------------------------------------------------------------
+
 
 class FunctionOfferingLinkIn(BaseModel):
     offering_id: str = Field(..., description="UUID of the catering offering to associate")
@@ -103,18 +108,19 @@ class FunctionOfferingOut(CatalogBase):
 # Menu Categories
 # ---------------------------------------------------------------------------
 
+
 class MenuCategoryIn(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
-    description: Optional[str] = None
+    description: str | None = None
     sort_order: int = 0
     is_active: bool = True
 
 
 class MenuCategoryUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=120)
-    description: Optional[str] = None
-    sort_order: Optional[int] = None
-    is_active: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=120)
+    description: str | None = None
+    sort_order: int | None = None
+    is_active: bool | None = None
 
 
 class MenuCategoryOut(CatalogBase):
@@ -122,7 +128,7 @@ class MenuCategoryOut(CatalogBase):
     caterer_id: str
     name: str
     slug: str
-    description: Optional[str] = None
+    description: str | None = None
     sort_order: int
     is_active: bool
     created_at: datetime
@@ -133,26 +139,27 @@ class MenuCategoryOut(CatalogBase):
 # Menu Items
 # ---------------------------------------------------------------------------
 
+
 class MenuItemIn(BaseModel):
     category_id: str = Field(..., description="UUID of the parent menu category")
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = None
-    dietary_type: Optional[str] = Field(None, description="VEG, NON_VEG, VEGAN, EGG")
-    image_url: Optional[str] = None
+    description: str | None = None
+    dietary_type: str | None = Field(None, description="VEG, NON_VEG, VEGAN, EGG")
+    image_url: str | None = None
     is_active: bool = True
     sort_order: int = 0
-    extra_metadata: Optional[dict] = None
+    extra_metadata: dict | None = None
 
 
 class MenuItemUpdate(BaseModel):
-    category_id: Optional[str] = None
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    description: Optional[str] = None
-    dietary_type: Optional[str] = None
-    image_url: Optional[str] = None
-    is_active: Optional[bool] = None
-    sort_order: Optional[int] = None
-    extra_metadata: Optional[dict] = None
+    category_id: str | None = None
+    name: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = None
+    dietary_type: str | None = None
+    image_url: str | None = None
+    is_active: bool | None = None
+    sort_order: int | None = None
+    extra_metadata: dict | None = None
 
 
 class MenuItemOut(CatalogBase):
@@ -161,12 +168,12 @@ class MenuItemOut(CatalogBase):
     category_id: str
     name: str
     slug: str
-    description: Optional[str] = None
-    dietary_type: Optional[str] = None
-    image_url: Optional[str] = None
+    description: str | None = None
+    dietary_type: str | None = None
+    image_url: str | None = None
     is_active: bool
     sort_order: int
-    extra_metadata: Optional[dict] = None
+    extra_metadata: dict | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -175,12 +182,13 @@ class MenuItemOut(CatalogBase):
 # Packages
 # ---------------------------------------------------------------------------
 
+
 class PackageIn(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = None
-    image_url: Optional[str] = None
-    min_guests: Optional[int] = Field(None, gt=0)
-    max_guests: Optional[int] = Field(None, gt=0)
+    description: str | None = None
+    image_url: str | None = None
+    min_guests: int | None = Field(None, gt=0)
+    max_guests: int | None = Field(None, gt=0)
     is_active: bool = True
     sort_order: int = 0
 
@@ -193,13 +201,13 @@ class PackageIn(BaseModel):
 
 
 class PackageUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    description: Optional[str] = None
-    image_url: Optional[str] = None
-    min_guests: Optional[int] = Field(None, gt=0)
-    max_guests: Optional[int] = Field(None, gt=0)
-    is_active: Optional[bool] = None
-    sort_order: Optional[int] = None
+    name: str | None = Field(None, min_length=1, max_length=200)
+    description: str | None = None
+    image_url: str | None = None
+    min_guests: int | None = Field(None, gt=0)
+    max_guests: int | None = Field(None, gt=0)
+    is_active: bool | None = None
+    sort_order: int | None = None
 
     @model_validator(mode="after")
     def validate_guest_limits(self) -> "PackageUpdate":
@@ -214,10 +222,10 @@ class PackageOut(CatalogBase):
     caterer_id: str
     name: str
     slug: str
-    description: Optional[str] = None
-    image_url: Optional[str] = None
-    min_guests: Optional[int] = None
-    max_guests: Optional[int] = None
+    description: str | None = None
+    image_url: str | None = None
+    min_guests: int | None = None
+    max_guests: int | None = None
     is_active: bool
     sort_order: int
     created_at: datetime
@@ -227,6 +235,7 @@ class PackageOut(CatalogBase):
 # ---------------------------------------------------------------------------
 # Package Items
 # ---------------------------------------------------------------------------
+
 
 class PackageItemIn(BaseModel):
     menu_item_id: str
@@ -247,9 +256,10 @@ class PackageItemOut(CatalogBase):
 # Package Selection Groups
 # ---------------------------------------------------------------------------
 
+
 class PackageSelectionGroupIn(BaseModel):
     name: str = Field(..., min_length=1, max_length=150)
-    description: Optional[str] = None
+    description: str | None = None
     min_selections: int = Field(0, ge=0)
     max_selections: int = Field(1, ge=1)
     sort_order: int = 0
@@ -263,12 +273,12 @@ class PackageSelectionGroupIn(BaseModel):
 
 
 class PackageSelectionGroupUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=150)
-    description: Optional[str] = None
-    min_selections: Optional[int] = Field(None, ge=0)
-    max_selections: Optional[int] = Field(None, ge=1)
-    sort_order: Optional[int] = None
-    is_required: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=150)
+    description: str | None = None
+    min_selections: int | None = Field(None, ge=0)
+    max_selections: int | None = Field(None, ge=1)
+    sort_order: int | None = None
+    is_required: bool | None = None
 
 
 class PackageSelectionGroupItemIn(BaseModel):
@@ -286,23 +296,24 @@ class PackageSelectionGroupOut(CatalogBase):
     id: str
     package_id: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     min_selections: int
     max_selections: int
     sort_order: int
     is_required: bool
     created_at: datetime
     updated_at: datetime
-    items: List[PackageSelectionGroupItemOut] = []
+    items: list[PackageSelectionGroupItemOut] = []
 
 
 # ---------------------------------------------------------------------------
 # Package Addons
 # ---------------------------------------------------------------------------
 
+
 class PackageAddonIn(BaseModel):
     menu_item_id: str
-    display_name: Optional[str] = Field(None, max_length=200)
+    display_name: str | None = Field(None, max_length=200)
     is_active: bool = True
     sort_order: int = 0
 
@@ -311,7 +322,7 @@ class PackageAddonOut(CatalogBase):
     id: str
     package_id: str
     menu_item_id: str
-    display_name: Optional[str] = None
+    display_name: str | None = None
     is_active: bool
     sort_order: int
     created_at: datetime
@@ -321,7 +332,8 @@ class PackageAddonOut(CatalogBase):
 # Package Full Detail (nested)
 # ---------------------------------------------------------------------------
 
+
 class PackageDetailOut(PackageOut):
-    package_items: List[PackageItemOut] = []
-    selection_groups: List[PackageSelectionGroupOut] = []
-    addons: List[PackageAddonOut] = []
+    package_items: list[PackageItemOut] = []
+    selection_groups: list[PackageSelectionGroupOut] = []
+    addons: list[PackageAddonOut] = []

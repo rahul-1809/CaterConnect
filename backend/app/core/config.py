@@ -2,8 +2,8 @@
 CaterConnect Backend — Core Configuration
 Loads all settings from environment variables / .env file.
 """
+
 from functools import lru_cache
-from typing import List
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     otp_dev_mode: bool = True
 
     # CORS
-    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:3001"]
+    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3001"]
 
     # Logging
     log_level: str = "INFO"

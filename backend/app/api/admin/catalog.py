@@ -3,7 +3,6 @@ CaterConnect Backend — Admin Catalog API Router
 Full CRUD endpoints for caterer catalog management (Phase 3).
 All routes require ADMIN or STAFF role.
 """
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,6 +49,7 @@ router = APIRouter(dependencies=[Depends(require_role("ADMIN", "STAFF"))])
 # Helper: resolve caterer_id from current admin user
 # ---------------------------------------------------------------------------
 
+
 async def _caterer_id(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -61,9 +61,10 @@ async def _caterer_id(
 # FUNCTION TYPES
 # ===========================================================================
 
+
 @router.get(
     "/functions",
-    response_model=StandardResponse[List[FunctionTypeOut]],
+    response_model=StandardResponse[list[FunctionTypeOut]],
     summary="List function types",
 )
 async def list_function_types(
@@ -130,9 +131,7 @@ async def link_offering(
     db: AsyncSession = Depends(get_db),
     caterer_id: str = Depends(_caterer_id),
 ):
-    link = await svc.link_function_offering(
-        db, caterer_id, function_type_id, payload.offering_id
-    )
+    link = await svc.link_function_offering(db, caterer_id, function_type_id, payload.offering_id)
     return StandardResponse(data=link, message="Offering linked to function type.")
 
 
@@ -154,9 +153,10 @@ async def unlink_offering(
 # CATERING OFFERINGS
 # ===========================================================================
 
+
 @router.get(
     "/offerings",
-    response_model=StandardResponse[List[CateringOfferingOut]],
+    response_model=StandardResponse[list[CateringOfferingOut]],
     summary="List catering offerings",
 )
 async def list_offerings(
@@ -215,9 +215,10 @@ async def update_offering(
 # MENU CATEGORIES
 # ===========================================================================
 
+
 @router.get(
     "/menu/categories",
-    response_model=StandardResponse[List[MenuCategoryOut]],
+    response_model=StandardResponse[list[MenuCategoryOut]],
     summary="List menu categories",
 )
 async def list_menu_categories(
@@ -275,13 +276,14 @@ async def update_menu_category(
 # MENU ITEMS
 # ===========================================================================
 
+
 @router.get(
     "/menu/items",
-    response_model=StandardResponse[List[MenuItemOut]],
+    response_model=StandardResponse[list[MenuItemOut]],
     summary="List menu items",
 )
 async def list_menu_items(
-    category_id: Optional[str] = Query(None, description="Filter by category UUID"),
+    category_id: str | None = Query(None, description="Filter by category UUID"),
     include_inactive: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     caterer_id: str = Depends(_caterer_id),
@@ -342,9 +344,10 @@ async def update_menu_item(
 # PACKAGES
 # ===========================================================================
 
+
 @router.get(
     "/packages",
-    response_model=StandardResponse[List[PackageOut]],
+    response_model=StandardResponse[list[PackageOut]],
     summary="List packages",
 )
 async def list_packages(
@@ -419,6 +422,7 @@ async def update_package(
 # Package Items
 # ------------------------------------
 
+
 @router.post(
     "/packages/{package_id}/items",
     response_model=StandardResponse[PackageItemOut],
@@ -432,8 +436,12 @@ async def add_package_item(
     caterer_id: str = Depends(_caterer_id),
 ):
     obj = await svc.add_package_item(
-        db, caterer_id, package_id,
-        payload.menu_item_id, payload.inclusion_type, payload.sort_order,
+        db,
+        caterer_id,
+        package_id,
+        payload.menu_item_id,
+        payload.inclusion_type,
+        payload.sort_order,
     )
     return StandardResponse(data=obj, message="Item added to package.")
 
@@ -456,6 +464,7 @@ async def remove_package_item(
 # Package Selection Groups
 # ------------------------------------
 
+
 @router.post(
     "/packages/{package_id}/selection-groups",
     response_model=StandardResponse[PackageSelectionGroupOut],
@@ -469,10 +478,15 @@ async def create_selection_group(
     caterer_id: str = Depends(_caterer_id),
 ):
     obj = await svc.create_selection_group(
-        db, caterer_id, package_id,
-        payload.name, payload.description,
-        payload.min_selections, payload.max_selections,
-        payload.sort_order, payload.is_required,
+        db,
+        caterer_id,
+        package_id,
+        payload.name,
+        payload.description,
+        payload.min_selections,
+        payload.max_selections,
+        payload.sort_order,
+        payload.is_required,
     )
     return StandardResponse(data=obj, message="Selection group created.")
 
@@ -490,7 +504,10 @@ async def update_selection_group(
     caterer_id: str = Depends(_caterer_id),
 ):
     obj = await svc.update_selection_group(
-        db, caterer_id, package_id, group_id,
+        db,
+        caterer_id,
+        package_id,
+        group_id,
         **payload.model_dump(exclude_none=True),
     )
     return StandardResponse(data=obj, message="Selection group updated.")
@@ -527,14 +544,13 @@ async def remove_selection_group_item(
     db: AsyncSession = Depends(get_db),
     caterer_id: str = Depends(_caterer_id),
 ):
-    await svc.remove_selection_group_item(
-        db, caterer_id, package_id, group_id, item_id
-    )
+    await svc.remove_selection_group_item(db, caterer_id, package_id, group_id, item_id)
 
 
 # ------------------------------------
 # Package Addons
 # ------------------------------------
+
 
 @router.post(
     "/packages/{package_id}/addons",
@@ -549,9 +565,13 @@ async def add_package_addon(
     caterer_id: str = Depends(_caterer_id),
 ):
     obj = await svc.add_package_addon(
-        db, caterer_id, package_id,
-        payload.menu_item_id, payload.display_name,
-        payload.is_active, payload.sort_order,
+        db,
+        caterer_id,
+        package_id,
+        payload.menu_item_id,
+        payload.display_name,
+        payload.is_active,
+        payload.sort_order,
     )
     return StandardResponse(data=obj, message="Addon added to package.")
 

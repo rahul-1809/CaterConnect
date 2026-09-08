@@ -2,7 +2,8 @@
 CaterConnect Backend — Health Check API
 Provides basic health and readiness endpoints.
 """
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
@@ -26,7 +27,7 @@ async def health_check():
         "app": settings.app_name,
         "version": settings.app_version,
         "env": settings.app_env,
-        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "timestamp": datetime.now(tz=UTC).isoformat(),
     }
 
 
@@ -45,12 +46,11 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
         db_error = str(e)
 
     status = "ok" if db_ok else "degraded"
-    http_status = 200 if db_ok else 503
 
     return {
         "status": status,
         "checks": {
             "database": {"ok": db_ok, "error": db_error},
         },
-        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "timestamp": datetime.now(tz=UTC).isoformat(),
     }

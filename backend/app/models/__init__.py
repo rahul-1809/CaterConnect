@@ -2,7 +2,9 @@
 CaterConnect Backend — Models Package
 Exports all SQLAlchemy ORM models.
 """
-from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+
+from app.core.database import Base
+from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
 from app.models.user import (
     Caterer,
     CatererAdmin,

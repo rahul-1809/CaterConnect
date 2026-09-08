@@ -2,7 +2,9 @@
 CaterConnect Backend — Phase 2 Authentication Test Suite
 Covers OTP request, OTP verification, rate limiting, session cookies, and /auth/me.
 """
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -107,7 +109,9 @@ async def test_otp_verify_existing_customer(client: AsyncClient, db_session: Asy
     )
     db_session.add(existing_user)
     await db_session.flush()
-    profile = CustomerProfile(user_id=existing_user.id, full_name="Rahul Verma", email="rahul@example.com")
+    profile = CustomerProfile(
+        user_id=existing_user.id, full_name="Rahul Verma", email="rahul@example.com"
+    )
     db_session.add(profile)
     await db_session.commit()
 
@@ -156,7 +160,7 @@ async def test_otp_verify_max_attempts_exceeded(client: AsyncClient, db_session:
         phone_number="+919555566666",
         country_code="+91",
         code_hash=hash_otp("123456"),
-        expires_at=datetime.now(tz=timezone.utc) + timedelta(minutes=5),
+        expires_at=datetime.now(tz=UTC) + timedelta(minutes=5),
         attempt_count=5,
         max_attempts=5,
     )
@@ -180,7 +184,7 @@ async def test_otp_verify_expired_challenge(client: AsyncClient, db_session: Asy
         phone_number="+919666677777",
         country_code="+91",
         code_hash=hash_otp("123456"),
-        expires_at=datetime.now(tz=timezone.utc) - timedelta(minutes=1),  # Expired
+        expires_at=datetime.now(tz=UTC) - timedelta(minutes=1),  # Expired
         attempt_count=0,
         max_attempts=5,
     )
@@ -204,10 +208,10 @@ async def test_otp_verify_already_consumed(client: AsyncClient, db_session: Asyn
         phone_number="+919777788888",
         country_code="+91",
         code_hash=hash_otp("123456"),
-        expires_at=datetime.now(tz=timezone.utc) + timedelta(minutes=5),
+        expires_at=datetime.now(tz=UTC) + timedelta(minutes=5),
         attempt_count=0,
         max_attempts=5,
-        consumed_at=datetime.now(tz=timezone.utc),  # Already consumed
+        consumed_at=datetime.now(tz=UTC),  # Already consumed
     )
     db_session.add(challenge)
     await db_session.commit()

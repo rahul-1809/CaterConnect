@@ -2,12 +2,13 @@
 CaterConnect Backend — Security Utilities
 Session management, token signing, and password hashing utilities.
 """
+
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from jose import JWTError, jwt
+from jose import jwt
 from passlib.context import CryptContext
 
 from app.core.config import get_settings
@@ -51,7 +52,7 @@ def create_session_token(user_id: str, role: str) -> str:
     The token is stored in an HTTP-only cookie on the client.
     """
     settings = get_settings()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     expire = now + timedelta(seconds=settings.session_expire_seconds)
     payload = {
         "sub": user_id,

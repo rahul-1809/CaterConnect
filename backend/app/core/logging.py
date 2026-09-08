@@ -1,6 +1,7 @@
 """
 CaterConnect Backend — Structured Logging Setup
 """
+
 import logging
 import sys
 

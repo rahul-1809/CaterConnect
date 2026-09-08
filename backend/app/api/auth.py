@@ -2,6 +2,7 @@
 CaterConnect Backend — Authentication API Endpoints
 Implements OTP request, OTP verification, session logout, and current user retrieval.
 """
+
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 

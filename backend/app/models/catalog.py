@@ -5,16 +5,16 @@ Tables: function_types, catering_offerings, function_offerings,
         packages, package_functions, package_offerings, package_items,
         package_selection_groups, package_selection_group_items, package_addons
 """
+
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
-    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -26,10 +26,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
 
-
 # ---------------------------------------------------------------------------
 # Function Types
 # ---------------------------------------------------------------------------
+
 
 class FunctionType(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Represents an event category: Wedding, Birthday, Corporate, etc."""
@@ -47,8 +47,8 @@ class FunctionType(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     slug: Mapped[str] = mapped_column(String(140), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
@@ -74,6 +74,7 @@ class FunctionType(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 # Catering Offerings
 # ---------------------------------------------------------------------------
 
+
 class CateringOffering(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Represents a service type: Lunch, Dinner, Breakfast, High Tea, etc."""
 
@@ -90,8 +91,8 @@ class CateringOffering(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     slug: Mapped[str] = mapped_column(String(160), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
@@ -116,6 +117,7 @@ class CateringOffering(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 # ---------------------------------------------------------------------------
 # Function ↔ Offering M2M
 # ---------------------------------------------------------------------------
+
 
 class FunctionOffering(Base, UUIDPrimaryKeyMixin):
     """Associates function types with catering offerings (many-to-many)."""
@@ -156,6 +158,7 @@ class FunctionOffering(Base, UUIDPrimaryKeyMixin):
 # Menu Categories
 # ---------------------------------------------------------------------------
 
+
 class MenuCategory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Groups menu items: Starters, Main Course, Breads, Desserts, etc."""
 
@@ -172,7 +175,7 @@ class MenuCategory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     slug: Mapped[str] = mapped_column(String(140), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -188,13 +191,12 @@ class MenuCategory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 # Menu Items
 # ---------------------------------------------------------------------------
 
+
 class MenuItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Represents an individual dish in the caterer's menu."""
 
     __tablename__ = "menu_items"
-    __table_args__ = (
-        UniqueConstraint("caterer_id", "slug", name="uq_menu_items_caterer_slug"),
-    )
+    __table_args__ = (UniqueConstraint("caterer_id", "slug", name="uq_menu_items_caterer_slug"),)
 
     caterer_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
@@ -210,21 +212,18 @@ class MenuItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     slug: Mapped[str] = mapped_column(String(220), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    dietary_type: Mapped[Optional[str]] = mapped_column(
-        String(40), nullable=True  # VEG, NON_VEG, VEGAN, EGG
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dietary_type: Mapped[str | None] = mapped_column(
+        String(40),
+        nullable=True,  # VEG, NON_VEG, VEGAN, EGG
     )
-    image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    extra_metadata: Mapped[Optional[dict]] = mapped_column(
-        "extra_metadata", JSON, nullable=True
-    )
+    extra_metadata: Mapped[dict | None] = mapped_column("extra_metadata", JSON, nullable=True)
 
     # Relationships
-    category: Mapped["MenuCategory"] = relationship(
-        "MenuCategory", back_populates="menu_items"
-    )
+    category: Mapped["MenuCategory"] = relationship("MenuCategory", back_populates="menu_items")
     menu_item_functions: Mapped[list["MenuItemFunction"]] = relationship(
         "MenuItemFunction",
         back_populates="menu_item",
@@ -256,6 +255,7 @@ class MenuItem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 # Menu Item Eligibility
 # ---------------------------------------------------------------------------
 
+
 class MenuItemFunction(Base):
     """Associates a menu item with function types it applies to."""
 
@@ -278,9 +278,7 @@ class MenuItemFunction(Base):
     )
 
     # Relationships
-    menu_item: Mapped["MenuItem"] = relationship(
-        "MenuItem", back_populates="menu_item_functions"
-    )
+    menu_item: Mapped["MenuItem"] = relationship("MenuItem", back_populates="menu_item_functions")
     function_type: Mapped["FunctionType"] = relationship(
         "FunctionType", back_populates="menu_item_functions"
     )
@@ -308,9 +306,7 @@ class MenuItemOffering(Base):
     )
 
     # Relationships
-    menu_item: Mapped["MenuItem"] = relationship(
-        "MenuItem", back_populates="menu_item_offerings"
-    )
+    menu_item: Mapped["MenuItem"] = relationship("MenuItem", back_populates="menu_item_offerings")
     offering: Mapped["CateringOffering"] = relationship(
         "CateringOffering", back_populates="menu_item_offerings"
     )
@@ -319,6 +315,7 @@ class MenuItemOffering(Base):
 # ---------------------------------------------------------------------------
 # Packages
 # ---------------------------------------------------------------------------
+
 
 class Package(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """A curated catering package with optional guest limits."""
@@ -341,10 +338,10 @@ class Package(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     slug: Mapped[str] = mapped_column(String(220), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    image_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    min_guests: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    max_guests: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    min_guests: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_guests: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
@@ -382,6 +379,7 @@ class Package(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 # ---------------------------------------------------------------------------
 # Package Applicability
 # ---------------------------------------------------------------------------
+
 
 class PackageFunction(Base):
     """Associates a package with function types it supports."""
@@ -437,13 +435,12 @@ class PackageOffering(Base):
 # Package Items
 # ---------------------------------------------------------------------------
 
+
 class PackageItem(Base, UUIDPrimaryKeyMixin):
     """Mandatory or included menu items in a package."""
 
     __tablename__ = "package_items"
-    __table_args__ = (
-        UniqueConstraint("package_id", "menu_item_id", name="uq_package_items"),
-    )
+    __table_args__ = (UniqueConstraint("package_id", "menu_item_id", name="uq_package_items"),)
 
     package_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
@@ -458,7 +455,9 @@ class PackageItem(Base, UUIDPrimaryKeyMixin):
         index=True,
     )
     inclusion_type: Mapped[str] = mapped_column(
-        String(30), default="INCLUDED", nullable=False
+        String(30),
+        default="INCLUDED",
+        nullable=False,
         # MANDATORY | INCLUDED
     )
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -476,6 +475,7 @@ class PackageItem(Base, UUIDPrimaryKeyMixin):
 # ---------------------------------------------------------------------------
 # Package Selection Groups
 # ---------------------------------------------------------------------------
+
 
 class PackageSelectionGroup(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Defines a 'choose N of M' selection rule within a package."""
@@ -495,7 +495,7 @@ class PackageSelectionGroup(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         index=True,
     )
     name: Mapped[str] = mapped_column(String(150), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     min_selections: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     max_selections: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -549,6 +549,7 @@ class PackageSelectionGroupItem(Base, UUIDPrimaryKeyMixin):
 # Package Addons
 # ---------------------------------------------------------------------------
 
+
 class PackageAddon(Base, UUIDPrimaryKeyMixin):
     """Optional paid additions exposed by a package."""
 
@@ -566,7 +567,7 @@ class PackageAddon(Base, UUIDPrimaryKeyMixin):
         nullable=False,
         index=True,
     )
-    display_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
