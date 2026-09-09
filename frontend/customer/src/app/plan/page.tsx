@@ -29,8 +29,10 @@ import {
   Package,
   PackageDetail,
 } from "../../lib/types";
+import { useAuth } from "@/context/AuthContext";
 
 function PlanContent() {
+  const { token, isAuthenticated, openAuthModal } = useAuth();
   const searchParams = useSearchParams();
   const queryEventId = searchParams.get("event_id");
   const queryPackageId = searchParams.get("package_id");
@@ -121,7 +123,7 @@ function PlanContent() {
   // Fetch / Refresh Estimate for Event
   const refreshEstimate = async (targetEventId: string) => {
     setIsLoadingEstimate(true);
-    const res = await getEventEstimate(targetEventId);
+    const res = await getEventEstimate(targetEventId, token || undefined);
     if (res.data) {
       setEstimate(res.data);
       setIsEstimateStale(res.isStale);
@@ -133,7 +135,7 @@ function PlanContent() {
   const handleRecalculateEstimate = async () => {
     if (!eventId) return;
     setIsLoadingEstimate(true);
-    const res = await calculateEventEstimate(eventId, version);
+    const res = await calculateEventEstimate(eventId, version, token || undefined);
     if (res.data) {
       setEstimate(res.data);
       setIsEstimateStale(false);
@@ -148,7 +150,7 @@ function PlanContent() {
   useEffect(() => {
     if (!eventId) return;
     async function loadEvent() {
-      const res = await getEventDetails(eventId!);
+      const res = await getEventDetails(eventId!, token || undefined);
       if (res.data) {
         const ev = res.data;
         setVersion(ev.configuration_version || 1);
@@ -241,7 +243,7 @@ function PlanContent() {
           venue_name: venueName || undefined,
           venue_address: venueAddress || undefined,
           customer_notes: customerNotes || undefined,
-        });
+        }, token || undefined);
 
         if (createRes.error || !createRes.data) {
           setErrorMessage(createRes.error || "Failed to create draft");
@@ -270,7 +272,7 @@ function PlanContent() {
             venue_address: venueAddress || undefined,
             customer_notes: customerNotes || undefined,
           },
-          undefined,
+          token || undefined,
           version
         );
 
@@ -313,11 +315,15 @@ function PlanContent() {
         }
 
         if (menuPayload.length > 0 || selectedPackageId) {
-          const cfgRes = await updateEventConfiguration(eventId, {
-            base_version: curVer,
-            package_id: selectedPackageId || undefined,
-            menu_items: menuPayload,
-          });
+          const cfgRes = await updateEventConfiguration(
+            eventId,
+            {
+              base_version: curVer,
+              package_id: selectedPackageId || undefined,
+              menu_items: menuPayload,
+            },
+            token || undefined
+          );
 
           if (cfgRes.error) {
             setErrorMessage(cfgRes.error);
@@ -349,7 +355,7 @@ function PlanContent() {
 
     setIsOptimizingBudget(true);
     setErrorMessage(null);
-    const res = await getBudgetOptimizations(eventId, budgetMax);
+    const res = await getBudgetOptimizations(eventId, budgetMax, token || undefined);
     if (res.data?.recommendations) {
       setRecommendations(res.data.recommendations);
       setShowRecommendationModal(true);
@@ -366,7 +372,7 @@ function PlanContent() {
     setErrorMessage(null);
     setAppliedRecMessage(null);
 
-    const res = await applyBudgetRecommendation(eventId, recItem.id, version);
+    const res = await applyBudgetRecommendation(eventId, recItem.id, version, token || undefined);
     if (res.data) {
       setEstimate(res.data);
       setVersion(res.data.event_version);
@@ -375,7 +381,7 @@ function PlanContent() {
       setShowRecommendationModal(false);
 
       // Refresh event details
-      const evRes = await getEventDetails(eventId);
+      const evRes = await getEventDetails(eventId, token || undefined);
       if (evRes.data) {
         setServerMenuItems(evRes.data.menu_items || []);
         const custom: Record<string, number> = {};

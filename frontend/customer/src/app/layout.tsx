@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import AuthModal from "@/components/AuthModal";
+import { AuthProvider } from "@/context/AuthContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,9 +17,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CaterConnect — Bespoke Catering & Event Menus",
+  title: "CaterConnect — Bespoke Telugu & Andhra Catering Experiences",
   description:
-    "Explore luxury catering packages, bespoke menus, and gourmet culinary experiences for weddings, corporate summits, and private banquets.",
+    "Explore authentic Andhra & Hyderabadi catering packages, bespoke menus, and gourmet culinary experiences for weddings, housewarmings, and grand banquets.",
 };
 
 export default function RootLayout({
@@ -31,9 +33,12 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50 selection:bg-orange-500 selection:text-white">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        <AuthProvider>
+          <Navbar />
+          <main className="flex-1">{children}</main>
+          <Footer />
+          <AuthModal />
+        </AuthProvider>
       </body>
     </html>
   );

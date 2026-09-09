@@ -1,5 +1,37 @@
 export type DietaryType = "VEG" | "NON_VEG" | "VEGAN" | "EGG";
 
+export type UserRole = "CUSTOMER" | "ADMIN" | "STAFF";
+
+export interface CustomerProfile {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  notes: string | null;
+  created_at: string | null;
+}
+
+export interface User {
+  id: string;
+  phone_number: string;
+  phone_country_code: string;
+  role: UserRole;
+  is_active: boolean;
+  last_login_at?: string | null;
+  customer_profile?: CustomerProfile | null;
+}
+
+export interface OTPRequestResult {
+  challenge_id: string;
+  expires_in_seconds: number;
+  retry_after_seconds: number;
+  dev_otp?: string | null;
+}
+
+export interface OTPVerifyResult {
+  user: User;
+  session_token?: string | null;
+}
+
 export interface FunctionType {
   id: string;
   name: string;
