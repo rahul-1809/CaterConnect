@@ -13,12 +13,16 @@ import {
   getEventDetails,
   updateEventDetails,
   updateEventConfiguration,
-  addEventMenuItem,
-  removeEventMenuItem,
   getEventVersions,
+  getEventEstimate,
+  calculateEventEstimate,
+  getBudgetOptimizations,
+  applyBudgetRecommendation,
 } from "../../lib/api";
 import {
+  BudgetRecommendationItem,
   CateringOffering,
+  EstimateData,
   FunctionType,
   MenuCategory,
   MenuItem,
@@ -32,9 +36,9 @@ function PlanContent() {
   const queryPackageId = searchParams.get("package_id");
   const queryFunctionId = searchParams.get("function_id");
 
-  // Step state (1: Details, 2: Package & Selections, 3: Add-ons & Custom, 4: Review)
+  // Step state (1: Details, 2: Package & Selections, 3: Add-ons & Custom, 4: Review & Estimate)
   const [step, setStep] = useState<number>(1);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   // Catalog Data
   const [functions, setFunctions] = useState<FunctionType[]>([]);
@@ -64,16 +68,24 @@ function PlanContent() {
   const [customerNotes, setCustomerNotes] = useState<string>("");
 
   // Selected Menu Items State
-  // Map of group_id -> set of menu_item_ids selected for that group
   const [groupSelections, setGroupSelections] = useState<Record<string, string[]>>({});
-  // List of extra custom/addon items selected: map of item_id -> quantity
   const [customItems, setCustomItems] = useState<Record<string, number>>({});
-  // Server-confirmed event menu items
-  const [serverMenuItems, setServerMenuItems] = useState<any[]>([]);
+  const [, setServerMenuItems] = useState<any[]>([]);
 
   // Version History Modal
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [versionList, setVersionList] = useState<any[]>([]);
+
+  // Phase 6: Pricing & Estimate State
+  const [estimate, setEstimate] = useState<EstimateData | null>(null);
+  const [isEstimateStale, setIsEstimateStale] = useState<boolean>(false);
+  const [isLoadingEstimate, setIsLoadingEstimate] = useState<boolean>(false);
+
+  // Phase 7: Budget Recommendation State
+  const [recommendations, setRecommendations] = useState<BudgetRecommendationItem[]>([]);
+  const [showRecommendationModal, setShowRecommendationModal] = useState<boolean>(false);
+  const [isOptimizingBudget, setIsOptimizingBudget] = useState<boolean>(false);
+  const [appliedRecMessage, setAppliedRecMessage] = useState<string | null>(null);
 
   // Active category filter in Step 3
   const [activeCategory, setActiveCategory] = useState<string>("ALL");
@@ -106,6 +118,32 @@ function PlanContent() {
     loadCatalog();
   }, [queryFunctionId, queryPackageId]);
 
+  // Fetch / Refresh Estimate for Event
+  const refreshEstimate = async (targetEventId: string) => {
+    setIsLoadingEstimate(true);
+    const res = await getEventEstimate(targetEventId);
+    if (res.data) {
+      setEstimate(res.data);
+      setIsEstimateStale(res.isStale);
+    }
+    setIsLoadingEstimate(false);
+  };
+
+  // Recalculate authoritative estimate
+  const handleRecalculateEstimate = async () => {
+    if (!eventId) return;
+    setIsLoadingEstimate(true);
+    const res = await calculateEventEstimate(eventId, version);
+    if (res.data) {
+      setEstimate(res.data);
+      setIsEstimateStale(false);
+      setStatusMessage("Fresh estimate calculated and verified!");
+    } else if (res.error) {
+      setErrorMessage(res.error);
+    }
+    setIsLoadingEstimate(false);
+  };
+
   // Load Existing Event if eventId provided
   useEffect(() => {
     if (!eventId) return;
@@ -127,7 +165,6 @@ function PlanContent() {
         if (ev.customer_notes) setCustomerNotes(ev.customer_notes);
         if (ev.menu_items) {
           setServerMenuItems(ev.menu_items);
-          // Restore selections
           const groups: Record<string, string[]> = {};
           const custom: Record<string, number> = {};
           for (const item of ev.menu_items) {
@@ -141,6 +178,7 @@ function PlanContent() {
           setGroupSelections(groups);
           setCustomItems(custom);
         }
+        await refreshEstimate(ev.id);
       }
     }
     loadEvent();
@@ -164,6 +202,7 @@ function PlanContent() {
       }
       return { ...prev, [groupId]: [...current, itemId] };
     });
+    setIsEstimateStale(true);
   };
 
   // Handle Custom Item Add/Remove
@@ -179,9 +218,10 @@ function PlanContent() {
       }
       return updated;
     });
+    setIsEstimateStale(true);
   };
 
-  // Save Event Draft Action
+  // Save Plan Draft Handler
   const handleSaveDraft = async () => {
     setIsSaving(true);
     setErrorMessage(null);
@@ -189,7 +229,6 @@ function PlanContent() {
 
     try {
       if (!eventId) {
-        // Create new draft
         const createRes = await createEventDraft({
           function_type_id: selectedFunctionId || undefined,
           offering_id: selectedOfferingId || undefined,
@@ -214,8 +253,8 @@ function PlanContent() {
         setEventId(newEvent.id);
         setVersion(newEvent.configuration_version);
         setStatusMessage("Event draft created successfully! (v1)");
+        await refreshEstimate(newEvent.id);
       } else {
-        // Update core details
         const updateRes = await updateEventDetails(
           eventId,
           {
@@ -241,10 +280,9 @@ function PlanContent() {
           return;
         }
 
-        let curVer = updateRes.data.configuration_version;
+        const curVer = updateRes.data.configuration_version;
         setVersion(curVer);
 
-        // Build configuration payload
         const menuPayload: Array<{
           menu_item_id: string;
           source_type: string;
@@ -253,7 +291,6 @@ function PlanContent() {
           is_included?: boolean;
         }> = [];
 
-        // Add package selection group items
         for (const [grpId, itemIds] of Object.entries(groupSelections)) {
           for (const mId of itemIds) {
             menuPayload.push({
@@ -266,7 +303,6 @@ function PlanContent() {
           }
         }
 
-        // Add custom / addon items
         for (const [mId, qty] of Object.entries(customItems)) {
           menuPayload.push({
             menu_item_id: mId,
@@ -295,12 +331,65 @@ function PlanContent() {
         }
 
         setStatusMessage(`Event configuration updated and saved! (v${curVer + (menuPayload.length > 0 ? 1 : 0)})`);
+        await refreshEstimate(eventId);
       }
     } catch (err: any) {
       setErrorMessage(err.message || "An unexpected error occurred");
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Trigger Budget Optimization Analysis
+  const handleOptimizeBudget = async () => {
+    if (!eventId) {
+      await handleSaveDraft();
+    }
+    if (!eventId) return;
+
+    setIsOptimizingBudget(true);
+    setErrorMessage(null);
+    const res = await getBudgetOptimizations(eventId, budgetMax);
+    if (res.data?.recommendations) {
+      setRecommendations(res.data.recommendations);
+      setShowRecommendationModal(true);
+    } else if (res.error) {
+      setErrorMessage(res.error);
+    }
+    setIsOptimizingBudget(false);
+  };
+
+  // Apply a Budget Suggestion Atomically
+  const handleApplyRecommendation = async (recItem: BudgetRecommendationItem) => {
+    if (!eventId) return;
+    setIsOptimizingBudget(true);
+    setErrorMessage(null);
+    setAppliedRecMessage(null);
+
+    const res = await applyBudgetRecommendation(eventId, recItem.id, version);
+    if (res.data) {
+      setEstimate(res.data);
+      setVersion(res.data.event_version);
+      setIsEstimateStale(false);
+      setAppliedRecMessage(`Applied recommendation: "${recItem.title}". Estimate refreshed!`);
+      setShowRecommendationModal(false);
+
+      // Refresh event details
+      const evRes = await getEventDetails(eventId);
+      if (evRes.data) {
+        setServerMenuItems(evRes.data.menu_items || []);
+        const custom: Record<string, number> = {};
+        for (const it of evRes.data.menu_items) {
+          if (it.source_type === "CUSTOM" || it.source_type === "ADDON") {
+            custom[it.menu_item_id] = it.quantity || 1;
+          }
+        }
+        setCustomItems(custom);
+      }
+    } else if (res.error) {
+      setErrorMessage(res.error);
+    }
+    setIsOptimizingBudget(false);
   };
 
   // Open Version History Modal
@@ -327,6 +416,19 @@ function PlanContent() {
     Object.values(groupSelections).reduce((acc, list) => acc + list.length, 0) +
     Object.keys(customItems).length;
 
+  // Fallback client estimated range for instant feedback
+  const clientPerPersonRate = activePackage?.indicative_price || (activePackage?.slug?.includes("royal") ? 750 : activePackage?.slug?.includes("deluxe") ? 550 : 450);
+  const clientBaseTotal = clientPerPersonRate * guestCount;
+  const clientAddonsTotal = Object.entries(customItems).reduce((sum, [itemId, qty]) => {
+    const dish = menuItems.find((d) => d.id === itemId);
+    const p = dish?.extra_metadata?.addon_price || 85;
+    return sum + p * guestCount * qty;
+  }, 0);
+  const clientEstimatedTotal = (clientBaseTotal + clientAddonsTotal) * 1.10; // includes 5% service + 5% GST
+  const displayLower = estimate ? estimate.lower_amount : Math.round(clientEstimatedTotal / 500) * 500;
+  const displayUpper = estimate ? estimate.upper_amount : Math.round((clientEstimatedTotal * 1.12) / 500) * 500;
+  const displayBudgetStatus = estimate?.budget?.status || (displayUpper <= budgetMax ? "WITHIN_BUDGET" : displayUpper <= budgetMax * 1.15 ? "SLIGHTLY_ABOVE" : "ABOVE_BUDGET");
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 pb-24">
       {/* Header Banner */}
@@ -335,7 +437,7 @@ function PlanContent() {
           <div>
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                Phase 5 • Event Planner & Menu Builder
+                Phase 6 • Authoritative Pricing & Estimate Engine
               </span>
               {eventId && (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono bg-neutral-800 text-neutral-300 border border-neutral-700">
@@ -344,148 +446,176 @@ function PlanContent() {
               )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-1">
-              Plan Your Catering Experience
+              Plan & Estimate Your Catering
             </h1>
             <p className="text-sm text-neutral-400 mt-0.5">
-              Customize your menu, configure package selection rules, and save your draft with live version history.
+              Customize authentic menus, check real-time estimated pricing ranges, and optimize toward your budget.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             {eventId && (
               <button
+                type="button"
                 onClick={openHistory}
-                className="px-3.5 py-2 text-xs font-medium rounded-lg border border-neutral-700 bg-neutral-800/80 hover:bg-neutral-700 text-neutral-200 transition"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 text-xs font-medium transition"
               >
-                📜 Version History ({version})
+                📜 Version History (v{version})
               </button>
             )}
-            <Link
-              href="/events"
-              className="px-3.5 py-2 text-xs font-medium rounded-lg border border-neutral-700 bg-neutral-800/80 hover:bg-neutral-700 text-neutral-200 transition"
-            >
-              📂 My Saved Plans
-            </Link>
             <button
+              type="button"
               onClick={handleSaveDraft}
               disabled={isSaving}
-              className="px-5 py-2 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-lg shadow-amber-500/20 transition disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition disabled:opacity-50"
             >
-              {isSaving ? "Saving..." : "💾 Save Draft"}
+              {isSaving ? "Saving Draft..." : "💾 Save Plan Draft"}
             </button>
           </div>
         </div>
 
-        {/* Status / Alert Bar */}
-        {(statusMessage || errorMessage) && (
-          <div className="max-w-7xl mx-auto mt-4">
-            {statusMessage && (
-              <div className="p-3 rounded-lg bg-emerald-950/50 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between">
-                <span>✅ {statusMessage}</span>
-                <button onClick={() => setStatusMessage(null)} className="text-emerald-400 hover:text-white font-bold ml-2">✕</button>
-              </div>
-            )}
-            {errorMessage && (
-              <div className="p-3 rounded-lg bg-red-950/50 border border-red-500/30 text-red-300 text-xs flex items-center justify-between">
-                <span>⚠️ {errorMessage}</span>
-                <button onClick={() => setErrorMessage(null)} className="text-red-400 hover:text-white font-bold ml-2">✕</button>
-              </div>
-            )}
+        {/* Notifications */}
+        {statusMessage && (
+          <div className="max-w-7xl mx-auto mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between">
+            <span>✅ {statusMessage}</span>
+            <button onClick={() => setStatusMessage(null)} className="text-emerald-400 hover:text-emerald-200">✕</button>
+          </div>
+        )}
+        {appliedRecMessage && (
+          <div className="max-w-7xl mx-auto mt-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs flex items-center justify-between">
+            <span>💡 {appliedRecMessage}</span>
+            <button onClick={() => setAppliedRecMessage(null)} className="text-blue-400 hover:text-blue-200">✕</button>
+          </div>
+        )}
+        {errorMessage && (
+          <div className="max-w-7xl mx-auto mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center justify-between">
+            <span>⚠️ {errorMessage}</span>
+            <button onClick={() => setErrorMessage(null)} className="text-red-400 hover:text-red-200">✕</button>
           </div>
         )}
 
-        {/* Step Navigation Tabs */}
+        {/* Step Progression Bar */}
         <div className="max-w-7xl mx-auto mt-6">
-          <div className="grid grid-cols-4 gap-2 sm:gap-4 text-center text-xs font-medium">
-            {[
-              { id: 1, title: "1. Event Details", desc: "Date, Venue & Guests" },
-              { id: 2, title: "2. Package & Choices", desc: "Base Menu & Selections" },
-              { id: 3, title: "3. Add-on Dishes", desc: "Custom Items & Starters" },
-              { id: 4, title: "4. Review & Summary", desc: "Finalize & Save" },
-            ].map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setStep(s.id)}
-                className={`py-2.5 px-2 rounded-lg border transition text-left flex flex-col justify-center ${
-                  step === s.id
-                    ? "bg-amber-500/10 border-amber-500/40 text-amber-400 font-semibold"
-                    : step > s.id
-                    ? "bg-neutral-900 border-neutral-800 text-neutral-300"
-                    : "bg-neutral-950/40 border-neutral-900 text-neutral-500 hover:text-neutral-400"
-                }`}
-              >
-                <span className="font-semibold text-xs">{s.title}</span>
-                <span className="hidden sm:inline text-[11px] opacity-70 mt-0.5 truncate">{s.desc}</span>
-              </button>
-            ))}
+          <div className="grid grid-cols-4 gap-2 text-center text-xs font-medium">
+            <button
+              onClick={() => setStep(1)}
+              className={`py-2.5 px-2 rounded-xl transition border ${
+                step === 1
+                  ? "bg-amber-500/20 border-amber-500 text-amber-300 font-bold"
+                  : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:bg-neutral-800"
+              }`}
+            >
+              1. Event & Budget
+            </button>
+            <button
+              onClick={() => setStep(2)}
+              className={`py-2.5 px-2 rounded-xl transition border ${
+                step === 2
+                  ? "bg-amber-500/20 border-amber-500 text-amber-300 font-bold"
+                  : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:bg-neutral-800"
+              }`}
+            >
+              2. Package & Selection
+            </button>
+            <button
+              onClick={() => setStep(3)}
+              className={`py-2.5 px-2 rounded-xl transition border ${
+                step === 3
+                  ? "bg-amber-500/20 border-amber-500 text-amber-300 font-bold"
+                  : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:bg-neutral-800"
+              }`}
+            >
+              3. Add-ons & Custom Menu
+            </button>
+            <button
+              onClick={() => setStep(4)}
+              className={`py-2.5 px-2 rounded-xl transition border ${
+                step === 4
+                  ? "bg-amber-500/20 border-amber-500 text-amber-300 font-bold"
+                  : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:bg-neutral-800"
+              }`}
+            >
+              4. Review & Price Estimate
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Main Workspace Layout */}
+      {/* Main Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Step Workspace (Col 8) */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* STEP 1: EVENT DETAILS */}
+        {/* Left Interactive Wizard (Col 8) */}
+        <div className="lg:col-span-8 space-y-8">
+          {/* STEP 1: Details & Budget */}
           {step === 1 && (
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-6 sm:p-8 space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">Event Details & Specifications</h2>
-                <p className="text-sm text-neutral-400 mt-1">
-                  Tell us about your celebration occasion, venue coordinates, and expected guest headcount.
-                </p>
-              </div>
+            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 space-y-6">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>🗓️</span> Step 1: Event Information & Budget Target
+              </h2>
 
-              {/* Function Type Selector */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">
-                  Select Function Type
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {functions.map((fn) => (
-                    <button
-                      key={fn.id}
-                      type="button"
-                      onClick={() => setSelectedFunctionId(fn.id)}
-                      className={`p-3 rounded-xl border text-left transition ${
-                        selectedFunctionId === fn.id
-                          ? "bg-amber-500/10 border-amber-500 text-white shadow-md shadow-amber-500/5"
-                          : "bg-neutral-900/80 border-neutral-800 text-neutral-400 hover:border-neutral-700"
-                      }`}
-                    >
-                      <div className="font-medium text-sm text-white">{fn.name}</div>
-                      <div className="text-xs text-neutral-500 mt-0.5 line-clamp-1">{fn.description}</div>
-                    </button>
-                  ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
+                    Function Type *
+                  </label>
+                  <select
+                    value={selectedFunctionId}
+                    onChange={(e) => setSelectedFunctionId(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">Select Function Type</option>
+                    {functions.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
 
-              {/* Service Offering Selector */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">
-                  Service Offering Format
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {offerings.map((off) => (
-                    <button
-                      key={off.id}
-                      type="button"
-                      onClick={() => setSelectedOfferingId(off.id)}
-                      className={`p-3 rounded-xl border text-left transition ${
-                        selectedOfferingId === off.id
-                          ? "bg-amber-500/10 border-amber-500 text-white"
-                          : "bg-neutral-900/80 border-neutral-800 text-neutral-400 hover:border-neutral-700"
-                      }`}
-                    >
-                      <div className="font-medium text-sm text-white">{off.name}</div>
-                      <div className="text-xs text-neutral-500 mt-0.5">{off.description}</div>
-                    </button>
-                  ))}
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
+                    Service Style / Offering
+                  </label>
+                  <select
+                    value={selectedOfferingId}
+                    onChange={(e) => setSelectedOfferingId(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">Select Catering Offering</option>
+                    {offerings.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
 
-              {/* Date, Time & Headcount */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
+                    Expected Guest Count *
+                  </label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={5000}
+                    value={guestCount}
+                    onChange={(e) => setGuestCount(Math.max(1, parseInt(e.target.value) || 0))}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
+                    Target Budget (₹ Max)
+                  </label>
+                  <input
+                    type="number"
+                    step={5000}
+                    value={budgetMax}
+                    onChange={(e) => setBudgetMax(parseInt(e.target.value) || 0)}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
                     Event Date
@@ -494,222 +624,133 @@ function PlanContent() {
                     type="date"
                     value={eventDate}
                     onChange={(e) => setEventDate(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
-                    Start Time
+                    Event Time
                   </label>
                   <input
                     type="time"
                     value={eventTime}
                     onChange={(e) => setEventTime(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
-                    Guest Count: <span className="text-amber-400 font-bold">{guestCount}</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={10}
-                    max={10000}
-                    value={guestCount}
-                    onChange={(e) => setGuestCount(Number(e.target.value))}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
 
-              {/* Venue Coordinates */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
-                    Venue Name / Hall
+                    Venue Name & City
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Taj West End Grand Ballroom"
                     value={venueName}
                     onChange={(e) => setVenueName(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
-                    Venue Address
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="City, Area, Landmark"
-                    value={venueAddress}
-                    onChange={(e) => setVenueAddress(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
+                    placeholder="e.g. N Convention Center, Madhapur, Hyderabad"
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
 
-              {/* Budget Range */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">
-                  Target Budget Range (₹)
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 text-neutral-500 text-sm">₹</span>
-                    <input
-                      type="number"
-                      placeholder="Min Budget"
-                      value={budgetMin}
-                      onChange={(e) => setBudgetMin(Number(e.target.value))}
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-8 pr-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 text-neutral-500 text-sm">₹</span>
-                    <input
-                      type="number"
-                      placeholder="Max Budget"
-                      value={budgetMax}
-                      onChange={(e) => setBudgetMax(Number(e.target.value))}
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-8 pr-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Navigation button */}
               <div className="pt-4 border-t border-neutral-800 flex justify-end">
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-sm transition"
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-sm shadow-lg shadow-amber-500/20 transition"
                 >
-                  Continue to Package Selection →
+                  Continue to Packages →
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP 2: PACKAGE & SELECTION GROUPS */}
+          {/* STEP 2: Package & Selection Groups */}
           {step === 2 && (
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-6 sm:p-8 space-y-8">
-              <div>
-                <h2 className="text-xl font-bold text-white">Choose Package & Custom Selections</h2>
-                <p className="text-sm text-neutral-400 mt-1">
-                  Pick your curated foundation package and customize the specific dishes for each selection group.
-                </p>
+            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 space-y-6">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>🍽️</span> Step 2: Choose Curated Package & Selection Groups
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {packages.map((pkg) => {
+                  const isSelected = selectedPackageId === pkg.id;
+                  return (
+                    <div
+                      key={pkg.id}
+                      onClick={() => {
+                        setSelectedPackageId(pkg.id);
+                        setIsEstimateStale(true);
+                      }}
+                      className={`p-4 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                        isSelected
+                          ? "bg-amber-500/10 border-amber-500 shadow-md shadow-amber-500/10"
+                          : "bg-neutral-950/60 border-neutral-800 hover:border-neutral-700"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-white text-sm">{pkg.name}</h3>
+                          {isSelected && <span className="text-xs text-amber-400 font-bold">✓ Selected</span>}
+                        </div>
+                        <p className="text-xs text-neutral-400 mt-1 line-clamp-2">{pkg.description}</p>
+                      </div>
+                      <div className="mt-4 pt-3 border-t border-neutral-800/80 flex items-center justify-between text-xs text-neutral-400">
+                        <span>👥 {pkg.min_guests || 50} - {pkg.max_guests || 1000} guests</span>
+                        <span className="font-bold text-amber-400">₹{pkg.indicative_price || 550}/plate</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Package Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {packages.map((pkg) => (
-                  <button
-                    key={pkg.id}
-                    type="button"
-                    onClick={() => setSelectedPackageId(pkg.id)}
-                    className={`p-4 rounded-2xl border text-left transition relative flex flex-col justify-between ${
-                      selectedPackageId === pkg.id
-                        ? "bg-amber-500/10 border-amber-500 shadow-md shadow-amber-500/10"
-                        : "bg-neutral-900/90 border-neutral-800 hover:border-neutral-700"
-                    }`}
-                  >
-                    <div>
-                      {selectedPackageId === pkg.id && (
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500 text-neutral-950 mb-2">
-                          Active Selection
-                        </span>
-                      )}
-                      <h3 className="text-base font-bold text-white">{pkg.name}</h3>
-                      <p className="text-xs text-neutral-400 mt-1 line-clamp-2">{pkg.description}</p>
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-neutral-800/80 flex items-center justify-between text-xs">
-                      <span className="text-neutral-400">Min {pkg.min_guests || 50} guests</span>
-                      {pkg.indicative_price && (
-                        <span className="text-amber-400 font-semibold">₹{pkg.indicative_price}/person</span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Active Package Selection Groups */}
-              {activePackage && activePackage.selection_groups && activePackage.selection_groups.length > 0 && (
-                <div className="space-y-6 pt-4 border-t border-neutral-800">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <span>🍲 Custom Dish Selection Rules</span>
-                    <span className="text-xs font-normal text-neutral-400">
-                      (Choose dishes according to package constraints)
-                    </span>
+              {/* Selection Groups */}
+              {activePackage?.selection_groups && activePackage.selection_groups.length > 0 && (
+                <div className="space-y-4 pt-4 border-t border-neutral-800">
+                  <h3 className="font-bold text-sm text-white">
+                    Selection Rules for {activePackage.name}
                   </h3>
-
                   {activePackage.selection_groups.map((grp) => {
                     const selectedForGroup = groupSelections[grp.id] || [];
-                    const isSatisfied =
-                      selectedForGroup.length >= grp.min_selections &&
-                      (grp.max_selections === undefined || selectedForGroup.length <= grp.max_selections);
-
+                    const isMet = selectedForGroup.length >= grp.min_selections;
                     return (
-                      <div
-                        key={grp.id}
-                        className="bg-neutral-950 border border-neutral-800/80 rounded-xl p-4 sm:p-5 space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
+                      <div key={grp.id} className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
+                        <div className="flex items-center justify-between text-xs">
                           <div>
-                            <h4 className="font-semibold text-sm text-white">{grp.name}</h4>
-                            <p className="text-xs text-neutral-400 mt-0.5">{grp.description}</p>
-                          </div>
-                          <div className="text-right">
-                            <span
-                              className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                                isSatisfied
-                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                                  : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
-                              }`}
-                            >
-                              {selectedForGroup.length} / {grp.max_selections} selected
+                            <span className="font-bold text-white text-sm block">{grp.name}</span>
+                            <span className="text-neutral-400">
+                              Choose {grp.min_selections} to {grp.max_selections} dishes
                             </span>
                           </div>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                              isMet
+                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                            }`}
+                          >
+                            Selected: {selectedForGroup.length}/{grp.max_selections}
+                          </span>
                         </div>
 
-                        {/* Options in this group */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                          {grp.items.map((gi) => {
-                            const isSelected = selectedForGroup.includes(gi.menu_item_id);
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                          {grp.items?.map((gItem) => {
+                            const isPicked = selectedForGroup.includes(gItem.menu_item_id);
+                            const dish = gItem.menu_item || menuItems.find((m) => m.id === gItem.menu_item_id);
                             return (
                               <button
-                                key={gi.id}
+                                key={gItem.id}
                                 type="button"
-                                onClick={() =>
-                                  toggleGroupSelection(grp.id, gi.menu_item_id, grp.max_selections || 1)
-                                }
-                                className={`p-3 rounded-lg border text-left flex items-center justify-between transition ${
-                                  isSelected
-                                    ? "bg-amber-500/15 border-amber-500 text-white"
-                                    : "bg-neutral-900 border-neutral-800 text-neutral-300 hover:border-neutral-700"
+                                onClick={() => toggleGroupSelection(grp.id, gItem.menu_item_id, grp.max_selections)}
+                                className={`p-2.5 rounded-lg text-left text-xs border transition flex items-center justify-between ${
+                                  isPicked
+                                    ? "bg-amber-500/15 border-amber-500 text-white font-medium"
+                                    : "bg-neutral-900 border-neutral-800/80 text-neutral-300 hover:border-neutral-700"
                                 }`}
                               >
-                                <div>
-                                  <div className="text-xs font-semibold text-white">
-                                    {gi.menu_item?.name || "Dish Item"}
-                                  </div>
-                                  <div className="text-[11px] text-neutral-400">
-                                    {gi.menu_item?.dietary_type === "VEG" && "🟢 Vegetarian"}
-                                    {gi.menu_item?.dietary_type === "NON_VEG" && "🔴 Non-Vegetarian"}
-                                    {gi.menu_item?.dietary_type === "VEGAN" && "🌱 Vegan"}
-                                  </div>
-                                </div>
-                                <span
-                                  className={`w-5 h-5 rounded-full flex items-center justify-center text-xs border ${
-                                    isSelected
-                                      ? "bg-amber-500 border-amber-500 text-neutral-950 font-bold"
-                                      : "border-neutral-700 text-neutral-600"
-                                  }`}
-                                >
-                                  {isSelected ? "✓" : "+"}
-                                </span>
+                                <span>{dish?.name || "Dish"}</span>
+                                <span>{isPicked ? "✓" : "+"}</span>
                               </button>
                             );
                           })}
@@ -720,262 +761,297 @@ function PlanContent() {
                 </div>
               )}
 
-              {/* Navigation buttons */}
               <div className="pt-4 border-t border-neutral-800 flex justify-between">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
                   className="px-5 py-2.5 rounded-xl border border-neutral-800 text-neutral-300 hover:bg-neutral-800 text-sm font-medium transition"
                 >
-                  ← Back to Details
+                  ← Back
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep(3)}
-                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-sm transition"
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-sm shadow-lg shadow-amber-500/20 transition"
                 >
-                  Continue to Add-on Dishes →
+                  Continue to Add-ons →
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP 3: ADD-ON / CUSTOM ITEMS */}
+          {/* STEP 3: Add-ons & Custom Menu Builder */}
           {step === 3 && (
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-6 sm:p-8 space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">Add-on Dishes & Extra Specialties</h2>
-                <p className="text-sm text-neutral-400 mt-1">
-                  Enhance your catering spread with supplementary starters, live counters, breads, and artisanal desserts.
-                </p>
-              </div>
+            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 space-y-6">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>🍛</span> Step 3: Browse Authentic Catalog & Add Custom Dishes
+              </h2>
 
-              {/* Filters & Search */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="text"
-                  placeholder="Search dishes by name or ingredients..."
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                />
-
-                <select
-                  value={activeCategory}
-                  onChange={(e) => setActiveCategory(e.target.value)}
-                  className="bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="ALL">All Categories</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
+              {/* Category Pills & Filters */}
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setActiveCategory("ALL")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                      activeCategory === "ALL"
+                        ? "bg-amber-500 text-neutral-950 font-bold"
+                        : "bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white"
+                    }`}
+                  >
+                    All Categories ({menuItems.length})
+                  </button>
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setActiveCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                        activeCategory === cat.id
+                          ? "bg-amber-500 text-neutral-950 font-bold"
+                          : "bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white"
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
                   ))}
-                </select>
+                </div>
 
-                <select
-                  value={dietaryFilter}
-                  onChange={(e) => setDietaryFilter(e.target.value)}
-                  className="bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="ALL">All Dietary</option>
-                  <option value="VEG">Vegetarian Only</option>
-                  <option value="NON_VEG">Non-Vegetarian</option>
-                  <option value="VEGAN">Vegan Only</option>
-                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Search dishes (e.g. Biryani, Gongura, Pootharekulu)..."
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  />
+                  <select
+                    value={dietaryFilter}
+                    onChange={(e) => setDietaryFilter(e.target.value)}
+                    className="bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="ALL">All Diets</option>
+                    <option value="VEG">Vegetarian</option>
+                    <option value="NON_VEG">Non-Veg</option>
+                    <option value="VEGAN">Vegan</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Menu Item Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-1">
+              {/* Dish Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[480px] overflow-y-auto pr-1">
                 {filteredDishes.map((dish) => {
                   const qty = customItems[dish.id] || 0;
+                  const addonPrice = dish.extra_metadata?.addon_price || 85;
                   return (
                     <div
                       key={dish.id}
-                      className={`p-3.5 rounded-xl border flex items-center justify-between transition ${
-                        qty > 0
-                          ? "bg-amber-500/10 border-amber-500/40"
-                          : "bg-neutral-950/80 border-neutral-800 hover:border-neutral-700"
-                      }`}
+                      className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800/90 flex flex-col justify-between gap-2"
                     >
-                      <div className="pr-3">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              dish.dietary_type === "NON_VEG"
-                                ? "bg-red-500"
-                                : dish.dietary_type === "VEGAN"
-                                ? "bg-emerald-400"
-                                : "bg-emerald-500"
-                            }`}
-                          />
-                          <span className="font-semibold text-xs text-white">{dish.name}</span>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-bold text-white text-xs leading-snug">{dish.name}</h4>
+                          <p className="text-[11px] text-neutral-400 line-clamp-1 mt-0.5">{dish.description}</p>
                         </div>
-                        <p className="text-[11px] text-neutral-400 mt-1 line-clamp-1">{dish.description}</p>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono whitespace-nowrap">
+                          +₹{addonPrice}/guest
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        {qty > 0 ? (
-                          <div className="flex items-center border border-amber-500/50 bg-neutral-900 rounded-lg overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => modifyCustomItem(dish.id, -1)}
-                              className="px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800 font-bold"
-                            >
-                              -
-                            </button>
-                            <span className="px-2.5 text-xs text-amber-400 font-semibold">{qty}</span>
-                            <button
-                              type="button"
-                              onClick={() => modifyCustomItem(dish.id, 1)}
-                              className="px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800 font-bold"
-                            >
-                              +
-                            </button>
-                          </div>
-                        ) : (
+                      <div className="pt-2 border-t border-neutral-900 flex items-center justify-between text-xs">
+                        <span className="text-neutral-500 text-[11px] uppercase">
+                          {dish.dietary_type || "VEG"}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {qty > 0 && (
+                            <>
+                              <button
+                                onClick={() => modifyCustomItem(dish.id, -1)}
+                                className="w-6 h-6 rounded bg-neutral-800 hover:bg-neutral-700 text-white font-bold flex items-center justify-center text-xs"
+                              >
+                                -
+                              </button>
+                              <span className="font-bold text-amber-400 text-xs px-1">{qty}</span>
+                            </>
+                          )}
                           <button
-                            type="button"
                             onClick={() => modifyCustomItem(dish.id, 1)}
-                            className="px-3 py-1.5 rounded-lg border border-neutral-700 bg-neutral-900 text-xs font-medium text-neutral-200 hover:border-amber-500 hover:text-amber-400 transition"
+                            className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-medium text-xs transition"
                           >
-                            + Add
+                            + Add Dish
                           </button>
-                        )}
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Navigation buttons */}
               <div className="pt-4 border-t border-neutral-800 flex justify-between">
                 <button
                   type="button"
                   onClick={() => setStep(2)}
                   className="px-5 py-2.5 rounded-xl border border-neutral-800 text-neutral-300 hover:bg-neutral-800 text-sm font-medium transition"
                 >
-                  ← Back to Package
+                  ← Back
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep(4)}
-                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-sm transition"
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-sm shadow-lg shadow-amber-500/20 transition"
                 >
-                  Review Plan Summary →
+                  Review Price Estimate →
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP 4: REVIEW & FINALIZE */}
+          {/* STEP 4: Review & Authoritative Estimate Breakdown */}
           {step === 4 && (
-            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-6 sm:p-8 space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">Event Catering Plan Summary</h2>
-                <p className="text-sm text-neutral-400 mt-1">
-                  Review all event specifications and selected dishes before saving or submitting for pricing quotation.
-                </p>
+            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <span>📊</span> Step 4: Plan Review & Estimated Price Range
+                </h2>
+                <button
+                  onClick={handleRecalculateEstimate}
+                  disabled={isLoadingEstimate || !eventId}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-400 font-semibold transition"
+                >
+                  {isLoadingEstimate ? "Calculating..." : "🔄 Refresh Estimate"}
+                </button>
               </div>
 
-              {/* Key Specs Card */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-neutral-950 border border-neutral-800 text-xs">
-                <div>
-                  <span className="text-neutral-500 block">Function Type</span>
-                  <span className="font-semibold text-neutral-200 mt-0.5 block">
-                    {functions.find((f) => f.id === selectedFunctionId)?.name || "Not specified"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-neutral-500 block">Guest Count</span>
-                  <span className="font-semibold text-amber-400 mt-0.5 block">{guestCount} Guests</span>
-                </div>
-                <div>
-                  <span className="text-neutral-500 block">Date & Time</span>
-                  <span className="font-semibold text-neutral-200 mt-0.5 block">
-                    {eventDate || "TBD"} {eventTime && `at ${eventTime}`}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-neutral-500 block">Venue</span>
-                  <span className="font-semibold text-neutral-200 mt-0.5 block truncate">
-                    {venueName || "TBD"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Selected Dishes Breakdown */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-400">
-                  Included & Selected Dishes ({totalSelectedCount})
-                </h3>
-
-                {totalSelectedCount === 0 ? (
-                  <div className="p-6 rounded-xl border border-neutral-800 bg-neutral-950 text-center text-xs text-neutral-500">
-                    No custom dishes or group options selected yet. Return to Step 2 or 3 to add items.
+              {/* Estimate Highlights Card */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-500/15 via-neutral-900 to-neutral-950 border border-amber-500/30 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[11px] uppercase tracking-wider text-amber-400 font-bold">
+                      Authoritative Estimated Range
+                    </span>
+                    <div className="text-3xl font-extrabold text-white tracking-tight mt-0.5 font-mono">
+                      ₹{displayLower.toLocaleString()} – ₹{displayUpper.toLocaleString()}
+                    </div>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {Object.entries(groupSelections).map(([grpId, itemIds]) => {
-                      const grp = activePackage?.selection_groups?.find((g) => g.id === grpId);
-                      return (
-                        <div key={grpId} className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800">
-                          <div className="text-xs font-bold text-amber-400 mb-2">
-                            {grp?.name || "Package Group"}
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {itemIds.map((itemId) => {
-                              const dish = menuItems.find((d) => d.id === itemId);
-                              return (
-                                <div key={itemId} className="text-xs text-neutral-300 flex items-center gap-2">
-                                  <span className="text-amber-500 font-bold">•</span>
-                                  <span>{dish?.name || itemId}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="text-right">
+                    <span
+                      className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
+                        displayBudgetStatus === "WITHIN_BUDGET"
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          : displayBudgetStatus === "SLIGHTLY_ABOVE"
+                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                          : displayBudgetStatus === "ABOVE_BUDGET"
+                          ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                          : "bg-neutral-800 text-neutral-300"
+                      }`}
+                    >
+                      {displayBudgetStatus.replace("_", " ")}
+                    </span>
+                    <div className="text-[11px] text-neutral-400 mt-1">
+                      Target Budget: ₹{budgetMax.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
 
-                    {Object.entries(customItems).length > 0 && (
-                      <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800">
-                        <div className="text-xs font-bold text-amber-400 mb-2">Additional Add-ons & Custom Dishes</div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {Object.entries(customItems).map(([itemId, qty]) => {
-                            const dish = menuItems.find((d) => d.id === itemId);
-                            return (
-                              <div key={itemId} className="text-xs text-neutral-300 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-amber-500 font-bold">•</span>
-                                  <span>{dish?.name || itemId}</span>
-                                </div>
-                                <span className="text-neutral-500 text-[11px]">Qty: {qty}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+                {/* Overrun action button */}
+                {displayBudgetStatus !== "WITHIN_BUDGET" && (
+                  <div className="pt-3 border-t border-amber-500/20 flex items-center justify-between">
+                    <span className="text-xs text-amber-300">
+                      Estimate exceeds target budget. Would you like AI/rule recommendations?
+                    </span>
+                    <button
+                      onClick={handleOptimizeBudget}
+                      disabled={isOptimizingBudget}
+                      className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs shadow transition"
+                    >
+                      {isOptimizingBudget ? "Analyzing..." : "💡 Optimize Budget"}
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Special Customer Notes */}
+              {/* Explainable Line Item Breakdown Table */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-sm text-white">Itemized Estimate Breakdown</h3>
+                <div className="rounded-xl border border-neutral-800 overflow-hidden bg-neutral-950">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-neutral-900 border-b border-neutral-800 text-neutral-400 uppercase tracking-wider">
+                      <tr>
+                        <th className="p-3">Component</th>
+                        <th className="p-3 text-right">Rate / Unit</th>
+                        <th className="p-3 text-right">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-900 text-neutral-200">
+                      {estimate?.breakdown ? (
+                        estimate.breakdown.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-neutral-900/30">
+                            <td className="p-3 font-medium">{item.description}</td>
+                            <td className="p-3 text-right text-neutral-400">
+                              {item.rate ? `₹${item.rate}` : "—"}
+                            </td>
+                            <td className="p-3 text-right font-bold text-white font-mono">
+                              ₹{Math.round(item.amount).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <>
+                          <tr>
+                            <td className="p-3 font-medium">Base Package ({activePackage?.name || "Curated Menu"})</td>
+                            <td className="p-3 text-right text-neutral-400">₹{clientPerPersonRate}/guest</td>
+                            <td className="p-3 text-right font-bold text-white font-mono">₹{clientBaseTotal.toLocaleString()}</td>
+                          </tr>
+                          {clientAddonsTotal > 0 && (
+                            <tr>
+                              <td className="p-3 font-medium">Custom Add-on Dishes ({Object.keys(customItems).length} items)</td>
+                              <td className="p-3 text-right text-neutral-400">Variable</td>
+                              <td className="p-3 text-right font-bold text-white font-mono">₹{clientAddonsTotal.toLocaleString()}</td>
+                            </tr>
+                          )}
+                          <tr>
+                            <td className="p-3 font-medium">Service, Staffing & Live Counter Charge (5%)</td>
+                            <td className="p-3 text-right text-neutral-400">5.0%</td>
+                            <td className="p-3 text-right font-bold text-white font-mono">
+                              ₹{Math.round((clientBaseTotal + clientAddonsTotal) * 0.05).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="p-3 font-medium">Estimated Catering GST (5%)</td>
+                            <td className="p-3 text-right text-neutral-400">5.0%</td>
+                            <td className="p-3 text-right font-bold text-white font-mono">
+                              ₹{Math.round((clientBaseTotal + clientAddonsTotal) * 1.05 * 0.05).toLocaleString()}
+                            </td>
+                          </tr>
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Customer Disclaimer (FR-EST-002) */}
+              <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-400 space-y-1">
+                <span className="font-bold text-amber-400 block">⚠️ Official Estimation Disclaimer</span>
+                <p>
+                  {estimate?.disclaimer ||
+                    "Estimated price only. Final quotation is subject to caterer confirmation."}
+                </p>
+              </div>
+
+              {/* Notes */}
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
                   Special Catering Instructions / Chef Notes
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={customerNotes}
                   onChange={(e) => setCustomerNotes(e.target.value)}
-                  placeholder="e.g. Jain food counters required, mild spice level for starters, separate live chat stall..."
+                  placeholder="e.g. Jain food counters required, mild spice level for starters..."
                   className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
 
-              {/* Actions */}
+              {/* Step 4 Actions */}
               <div className="pt-4 border-t border-neutral-800 flex flex-col sm:flex-row gap-3 justify-between">
                 <button
                   type="button"
@@ -1003,35 +1079,82 @@ function PlanContent() {
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-neutral-900/80 border border-neutral-800 rounded-2xl p-6 sticky top-24 space-y-6">
             <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
-              <h3 className="font-bold text-sm text-white">Event Summary Card</h3>
+              <h3 className="font-bold text-sm text-white">Live Estimate Summary</h3>
               <span className="text-[11px] px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 font-mono">
                 v{version}
               </span>
             </div>
 
-            {/* Selected Package Badge */}
-            <div className="space-y-1">
-              <span className="text-[11px] uppercase tracking-wider text-neutral-500">Base Package</span>
-              <div className="font-semibold text-sm text-amber-400">
-                {activePackage?.name || "Custom Menu Build"}
+            {/* Estimated Price Range Card */}
+            <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+              <div className="flex items-center justify-between text-xs text-neutral-400">
+                <span>Estimated Range</span>
+                {isEstimateStale && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">
+                    Stale (Save to update)
+                  </span>
+                )}
+              </div>
+              <div className="text-xl font-bold text-amber-400 font-mono">
+                ₹{displayLower.toLocaleString()} – ₹{displayUpper.toLocaleString()}
+              </div>
+
+              {/* Budget Meter */}
+              <div className="space-y-1 pt-2">
+                <div className="flex justify-between text-[11px] text-neutral-400">
+                  <span>Target: ₹{budgetMax.toLocaleString()}</span>
+                  <span
+                    className={`font-semibold ${
+                      displayBudgetStatus === "WITHIN_BUDGET"
+                        ? "text-emerald-400"
+                        : "text-amber-400"
+                    }`}
+                  >
+                    {displayBudgetStatus.replace("_", " ")}
+                  </span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-neutral-800 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      displayBudgetStatus === "WITHIN_BUDGET"
+                        ? "bg-emerald-500"
+                        : "bg-amber-500"
+                    }`}
+                    style={{
+                      width: `${Math.min(100, Math.round((displayUpper / budgetMax) * 100))}%`,
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Headcount & Budget */}
+            {/* Optimize Budget Button */}
+            {displayBudgetStatus !== "WITHIN_BUDGET" && (
+              <button
+                type="button"
+                onClick={handleOptimizeBudget}
+                disabled={isOptimizingBudget}
+                className="w-full py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-bold text-xs transition flex items-center justify-center gap-2"
+              >
+                <span>💡</span> Optimize Budget Suggestions
+              </button>
+            )}
+
+            {/* Event Metrics */}
             <div className="grid grid-cols-2 gap-3 py-3 border-y border-neutral-800/80 text-xs">
               <div>
                 <span className="text-neutral-500 block">Guests</span>
                 <span className="font-bold text-white text-sm">{guestCount}</span>
               </div>
               <div>
-                <span className="text-neutral-500 block">Budget Range</span>
-                <span className="font-bold text-white text-sm">
-                  ₹{Math.round(budgetMin / 1000)}k - ₹{Math.round(budgetMax / 1000)}k
+                <span className="text-neutral-500 block">Package</span>
+                <span className="font-bold text-white text-xs truncate block">
+                  {activePackage?.name || "Custom Menu"}
                 </span>
               </div>
             </div>
 
-            {/* Selected Count Metrics */}
+            {/* Planned Items */}
             <div className="space-y-2 text-xs">
               <div className="flex justify-between text-neutral-300">
                 <span>Selection Group Items:</span>
@@ -1058,15 +1181,73 @@ function PlanContent() {
             >
               {isSaving ? "Saving..." : "💾 Save Plan Draft"}
             </button>
-
-            {eventId && (
-              <p className="text-center text-[11px] text-neutral-500">
-                Draft ID: <span className="font-mono">{eventId.slice(0, 13)}...</span>
-              </p>
-            )}
           </div>
         </div>
       </div>
+
+      {/* Budget Optimization Modal */}
+      {showRecommendationModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-xl w-full p-6 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <div className="flex items-center gap-2">
+                <span className="text-amber-400 text-lg">💡</span>
+                <h3 className="font-bold text-base text-white">Budget Optimization Suggestions</h3>
+              </div>
+              <button
+                onClick={() => setShowRecommendationModal(false)}
+                className="text-neutral-400 hover:text-white text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-400">
+              Non-destructive proposals calculated to bring your catering configuration within your target ₹
+              {budgetMax.toLocaleString()} budget.
+            </p>
+
+            <div className="overflow-y-auto space-y-3 flex-1 pr-1">
+              {recommendations.length === 0 ? (
+                <div className="text-center py-6 text-xs text-neutral-400">
+                  No automated reduction suggestions found. Your configuration is near optimum!
+                </div>
+              ) : (
+                recommendations.map((rec) => (
+                  <div
+                    key={rec.id}
+                    className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-bold text-sm text-white">{rec.title}</h4>
+                        <p className="text-xs text-neutral-400 mt-1">{rec.explanation}</p>
+                      </div>
+                      <span className="text-xs px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 font-bold whitespace-nowrap">
+                        Save ~₹{Math.round(rec.estimated_savings).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="pt-2 border-t border-neutral-900 flex items-center justify-between text-xs">
+                      <span className="text-neutral-400">
+                        Projected: ₹{rec.projected_range.lower.toLocaleString()} – ₹
+                        {rec.projected_range.upper.toLocaleString()}
+                      </span>
+                      <button
+                        onClick={() => handleApplyRecommendation(rec)}
+                        disabled={isOptimizingBudget}
+                        className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition"
+                      >
+                        Apply Suggestion
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Version History Modal */}
       {showHistoryModal && (
@@ -1094,9 +1275,12 @@ function PlanContent() {
                       {new Date(ver.created_at).toLocaleString()}
                     </span>
                   </div>
-                  <div className="text-neutral-300 font-medium">{ver.change_reason || "Updated configuration"}</div>
+                  <div className="text-neutral-300 font-medium">
+                    {ver.change_reason || "Updated configuration"}
+                  </div>
                   <div className="text-neutral-500 text-[11px]">
-                    Guest Count: {ver.snapshot?.guest_count || "N/A"} • Items: {ver.snapshot?.menu_items?.length || 0}
+                    Guest Count: {ver.snapshot?.guest_count || "N/A"} • Items:{" "}
+                    {ver.snapshot?.menu_items?.length || 0}
                   </div>
                 </div>
               ))}

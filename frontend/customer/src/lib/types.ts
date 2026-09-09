@@ -40,6 +40,7 @@ export interface MenuItem {
   sort_order: number;
   is_active: boolean;
   extra_metadata?: {
+    addon_price?: number;
     spice_level?: number; // 1 to 3
     allergens?: string[];
     is_chef_special?: boolean;
@@ -181,4 +182,83 @@ export interface EventVersion {
   change_reason?: string | null;
   created_at: string;
 }
+
+export type BudgetStatusType =
+  | "UNDER_BUDGET"
+  | "WITHIN_BUDGET"
+  | "SLIGHTLY_ABOVE"
+  | "ABOVE_BUDGET"
+  | "NO_BUDGET";
+
+export interface EstimateBreakdownItem {
+  type: string;
+  description: string;
+  amount: number;
+  rate?: number | null;
+  quantity?: number | null;
+}
+
+export interface BudgetSummary {
+  min?: number | null;
+  max?: number | null;
+  status: BudgetStatusType;
+  difference?: number | null;
+  difference_percentage?: number | null;
+}
+
+export interface EstimateData {
+  estimate_id: string;
+  event_id: string;
+  event_version: number;
+  pricing_version_id?: string | null;
+  currency: string;
+  lower_amount: number;
+  upper_amount: number;
+  budget: BudgetSummary;
+  breakdown: EstimateBreakdownItem[];
+  disclaimer: string;
+  generated_at: string;
+  is_stale: boolean;
+}
+
+export interface EstimateResponse {
+  data: EstimateData | null;
+  meta: {
+    status: "CURRENT" | "STALE";
+    event_id?: string;
+  };
+}
+
+export interface RecommendationChange {
+  operation: string;
+  menu_item_id?: string | null;
+  menu_item_name?: string | null;
+  replacement_item_id?: string | null;
+  replacement_item_name?: string | null;
+  estimated_savings: number;
+}
+
+export interface BudgetRecommendationItem {
+  id: string;
+  title: string;
+  explanation: string;
+  category: string;
+  changes: RecommendationChange[];
+  estimated_savings: number;
+  projected_range: {
+    lower: number;
+    upper: number;
+    currency: string;
+  };
+  projected_budget_status: BudgetStatusType;
+}
+
+export interface BudgetOptimizationData {
+  base_configuration_version: number;
+  target_budget: number;
+  current_lower: number;
+  current_upper: number;
+  recommendations: BudgetRecommendationItem[];
+}
+
 

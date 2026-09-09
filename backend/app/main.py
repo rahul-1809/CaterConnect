@@ -107,18 +107,25 @@ def create_application() -> FastAPI:
     # ---------------------------------------------------------------------------
     # Routers
     # ---------------------------------------------------------------------------
-    from app.api import auth, events, health
+    from app.api import auth, estimates, events, health
     from app.api import catalog as customer_catalog
     from app.api.admin import catalog as admin_catalog
+    from app.api.admin import pricing as admin_pricing
 
     application.include_router(health.router, prefix="/api/v1", tags=["health"])
     application.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
     application.include_router(customer_catalog.router, prefix="/api/v1", tags=["catalog"])
     application.include_router(events.router, prefix="/api/v1/events", tags=["events"])
+    application.include_router(estimates.router, prefix="/api/v1/events", tags=["estimates"])
     application.include_router(
         admin_catalog.router,
         prefix="/api/v1/admin",
         tags=["admin-catalog"],
+    )
+    application.include_router(
+        admin_pricing.router,
+        prefix="/api/v1/admin",
+        tags=["admin-pricing"],
     )
 
     return application

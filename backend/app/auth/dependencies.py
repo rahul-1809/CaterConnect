@@ -122,3 +122,6 @@ def require_role(*allowed_roles: str) -> Callable:
         return current_user
 
     return role_checker
+
+
+require_caterer_admin = require_role("ADMIN", "STAFF", "CATERER_ADMIN")

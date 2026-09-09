@@ -1261,3 +1261,105 @@ export async function getEventVersions(
   }
   return { versions: [], current_version: 1 };
 }
+
+// ---------------------------------------------------------------------------
+// Phase 6: Pricing & Estimate Engine APIs
+// ---------------------------------------------------------------------------
+
+export async function getEventEstimate(
+  eventId: string,
+  token?: string
+): Promise<{ data: any; isStale: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/events/${eventId}/estimate`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return {
+        data: json.data,
+        isStale: json.meta?.status === "STALE",
+      };
+    }
+    const json = await res.json().catch(() => ({}));
+    return { data: null, isStale: false, error: json.detail?.message || "Failed to load estimate" };
+  } catch (err: any) {
+    return { data: null, isStale: false, error: err.message || "Network error" };
+  }
+}
+
+export async function calculateEventEstimate(
+  eventId: string,
+  configurationVersion?: number,
+  token?: string
+): Promise<{ data: any; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/events/${eventId}/estimate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(configurationVersion ? { configuration_version: configurationVersion } : {}),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { data: null, error: json.detail?.message || "Failed to calculate estimate" };
+    }
+    return { data: json.data };
+  } catch (err: any) {
+    return { data: null, error: err.message || "Network error" };
+  }
+}
+
+export async function getBudgetOptimizations(
+  eventId: string,
+  targetBudget?: number,
+  token?: string
+): Promise<{ data: any; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/events/${eventId}/optimize-budget`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(targetBudget ? { target_budget: targetBudget } : {}),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { data: null, error: json.detail?.message || "Failed to generate recommendations" };
+    }
+    return { data: json.data };
+  } catch (err: any) {
+    return { data: null, error: err.message || "Network error" };
+  }
+}
+
+export async function applyBudgetRecommendation(
+  eventId: string,
+  recommendationId: string,
+  baseVersion: number,
+  token?: string
+): Promise<{ data: any; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/events/${eventId}/recommendations/${recommendationId}/apply`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ base_version: baseVersion }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { data: null, error: json.detail?.message || "Failed to apply recommendation" };
+    }
+    return { data: json.data };
+  } catch (err: any) {
+    return { data: null, error: err.message || "Network error" };
+  }
+}
+
